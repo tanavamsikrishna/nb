@@ -1,11 +1,13 @@
-import click
-import socket
 import json
-import sys
-import subprocess
-import time
 import shutil
+import socket
+import subprocess
+import sys
+import time
 from pathlib import Path
+
+import click
+
 from nb import daemon
 
 
@@ -74,7 +76,7 @@ def run(notebook: Path) -> None:
         resp = json.loads(resp_data.decode("utf-8").strip())
         if resp.get("status") == "ok":
             click.echo(
-                f"Notebook execution requested successfully. View output at http://localhost:7777"
+                "Notebook execution requested successfully. View output at http://localhost:7777"
             )
         else:
             click.echo(f"Execution failed: {resp.get('message')}", err=True)

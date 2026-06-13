@@ -19,6 +19,15 @@ from nb import HTML, MD, Object, display, nb_cache
 display(MD("### Welcome to the `nb` runner!"))
 display(HTML("<p style='color: #2563eb;'>This HTML text is styled directly.</p>"))
 
+display("Hello")
+time.sleep(1)
+display("Hello")
+time.sleep(1)
+display("Hello")
+time.sleep(1)
+display("Hello")
+time.sleep(1)
+
 # %% Cell 2: Collapsible Object Wrapper
 my_data = {
     "project": "nb",
@@ -27,6 +36,7 @@ my_data = {
     "nested": {"status": "active", "port": 7777, "socket": ".nb.sock"},
 }
 display(Object(my_data))
+display(MD("**Hello**"))
 
 # %% Cell 3: Caching with @nb_cache
 
@@ -40,7 +50,7 @@ def expensive_computation(x):
     return x * WINDOW
 
 
-res1 = expensive_computation(10)
+res1 = expensive_computation(3)
 display(f"Result 1: {res1}")
 
 # %% Cell 4: Verify Caching Hit
