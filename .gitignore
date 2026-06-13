@@ -8,3 +8,9 @@ wheels/
 
 # Virtual environments
 .venv
+
+# nb project specific
+nb/static/
+nb-ui/dist/
+nb-ui/node_modules/
+.nb.sock

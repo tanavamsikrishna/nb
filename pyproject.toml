@@ -1,7 +1,29 @@
 [project]
 name = "nb"
 version = "0.1.0"
-description = "Add your description here"
+description = "A lightweight Python notebook runner"
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "aiohttp",
+    "click",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+]
+polars = ["polars"]
+numpy = ["numpy"]
+pydantic = ["pydantic"]
+plotly = ["plotly"]
+altair = ["altair"]
+all = ["polars", "numpy", "pydantic", "plotly", "altair"]
+
+[project.scripts]
+nb = "nb.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
