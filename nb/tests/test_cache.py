@@ -3,20 +3,33 @@ import numpy as np
 import polars as pl
 from pydantic import BaseModel
 import nb.framework as fw
-from nb.framework import DisplayRecord, MD, _check_purity, _hash_value, display, nb_cache, _cache, clear_cache
+from nb.framework import (
+    DisplayRecord,
+    MD,
+    _check_purity,
+    _hash_value,
+    display,
+    nb_cache,
+    _cache,
+    clear_cache,
+)
+
 
 def test_purity_linter() -> None:
     # Pure function should pass
     def pure_func(x: int) -> int:
         return x + 1
+
     _check_purity(pure_func.__code__, "pure_func")
 
     # Impure function (mutates global) should raise SyntaxError
     def impure_func(x: int) -> None:
         global G
         G = x
+
     with pytest.raises(SyntaxError):
         _check_purity(impure_func.__code__, "impure_func")
+
 
 def test_hash_value() -> None:
     # Primitives
@@ -41,11 +54,13 @@ def test_hash_value() -> None:
     # Pydantic BaseModel
     class Model(BaseModel):
         val: int
+
     m1 = Model(val=10)
     m2 = Model(val=10)
     m3 = Model(val=11)
     assert _hash_value(m1) == _hash_value(m2)
     assert _hash_value(m1) != _hash_value(m3)
+
 
 def test_nb_cache_decorator() -> None:
     clear_cache()
@@ -68,6 +83,7 @@ def test_nb_cache_decorator() -> None:
     assert add(2, 4) == 6
     assert call_count == 2
 
+
 def test_nb_cache_captures_and_replays_display() -> None:
     clear_cache()
     emitted: list[DisplayRecord] = []
@@ -76,6 +92,7 @@ def test_nb_cache_captures_and_replays_display() -> None:
     call_count = 0
 
     try:
+
         @nb_cache
         def greet(name: str) -> str:
             nonlocal call_count
@@ -94,9 +111,10 @@ def test_nb_cache_captures_and_replays_display() -> None:
     finally:
         fw._active_emitter = old_emitter
 
+
 def test_nb_cache_keys() -> None:
     clear_cache()
-    
+
     # Establish globals in the module level for testing
     global WINDOW
     WINDOW = 5
@@ -119,6 +137,7 @@ def test_nb_cache_keys() -> None:
     WINDOW = 10
     assert get_windowed_value(10) == 20
     assert call_count == 2
+
 
 def test_clear_cache() -> None:
     clear_cache()

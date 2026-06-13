@@ -11,17 +11,19 @@ from nb import runner
 active_clients: Set[asyncio.Queue] = set()
 run_lock = asyncio.Lock()
 
+
 def emit_event(event_type: str, event_data: dict) -> None:
     event = {"event": event_type, "data": event_data}
     for queue in list(active_clients):
         queue.put_nowait(event)
 
+
 async def stream_handler(request: web.Request) -> web.StreamResponse:
     response = web.StreamResponse()
-    response.headers['Content-Type'] = 'text/event-stream'
-    response.headers['Cache-Control'] = 'no-cache'
-    response.headers['Connection'] = 'keep-alive'
-    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers["Content-Type"] = "text/event-stream"
+    response.headers["Cache-Control"] = "no-cache"
+    response.headers["Connection"] = "keep-alive"
+    response.headers["Access-Control-Allow-Origin"] = "*"
     await response.prepare(request)
 
     queue = asyncio.Queue()
@@ -29,26 +31,29 @@ async def stream_handler(request: web.Request) -> web.StreamResponse:
     try:
         while True:
             event = await queue.get()
-            event_type = event['event']
-            data_str = json.dumps(event['data'])
+            event_type = event["event"]
+            data_str = json.dumps(event["data"])
             msg = f"event: {event_type}\ndata: {data_str}\n\n"
-            await response.write(msg.encode('utf-8'))
+            await response.write(msg.encode("utf-8"))
     except asyncio.CancelledError:
         pass
     finally:
         active_clients.remove(queue)
     return response
 
+
 STATIC_DIR = Path(__file__).parent / "static"
+
 
 async def index_handler(request: web.Request) -> web.FileResponse | web.Response:
     index_file = STATIC_DIR / "index.html"
     if not index_file.exists():
         return web.Response(
             text="UI build not found. Please run `nb build-ui` first to compile and install the frontend.",
-            status=404
+            status=404,
         )
     return web.FileResponse(index_file)
+
 
 async def handle_ipc_client(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
     async with run_lock:
@@ -56,10 +61,10 @@ async def handle_ipc_client(reader: asyncio.StreamReader, writer: asyncio.Stream
             line = await reader.readline()
             if not line:
                 return
-            
-            req = json.loads(line.decode('utf-8'))
-            notebook_path = Path(req['path'])
-            
+
+            req = json.loads(line.decode("utf-8"))
+            notebook_path = Path(req["path"])
+
             loop = asyncio.get_running_loop()
 
             # Callback for capture in display primitives
@@ -67,7 +72,7 @@ async def handle_ipc_client(reader: asyncio.StreamReader, writer: asyncio.Stream
                 event_data = {
                     "cell_id": fw._current_cell_id,
                     "type": record.type,
-                    "payload": record.payload
+                    "payload": record.payload,
                 }
                 # Display primitives are executed in thread, call_soon_threadsafe is required
                 loop.call_soon_threadsafe(emit_event, "display_record", event_data)
@@ -91,12 +96,14 @@ async def handle_ipc_client(reader: asyncio.StreamReader, writer: asyncio.Stream
                     "HTML": fw.HTML,
                     "Object": fw.Object,
                 }
-                
+
                 # Execute notebook in separate thread so exec doesn't block the main event loop
-                await loop.run_in_executor(None, runner.run_notebook, notebook_path, exec_ns, thread_safe_emit_event)
-                
+                await loop.run_in_executor(
+                    None, runner.run_notebook, notebook_path, exec_ns, thread_safe_emit_event
+                )
+
                 resp = {"status": "ok"}
-                writer.write(json.dumps(resp).encode('utf-8') + b"\n")
+                writer.write(json.dumps(resp).encode("utf-8") + b"\n")
                 await writer.drain()
             finally:
                 fw._active_emitter = old_emitter
@@ -104,7 +111,7 @@ async def handle_ipc_client(reader: asyncio.StreamReader, writer: asyncio.Stream
         except Exception as e:
             resp = {"status": "error", "message": str(e)}
             try:
-                writer.write(json.dumps(resp).encode('utf-8') + b"\n")
+                writer.write(json.dumps(resp).encode("utf-8") + b"\n")
                 await writer.drain()
             except Exception:
                 pass
@@ -115,7 +122,8 @@ async def handle_ipc_client(reader: asyncio.StreamReader, writer: asyncio.Stream
             except Exception:
                 pass
 
-async def main(project_dir: Path, *, host: str = '0.0.0.0', port: int = 7777) -> None:
+
+async def main(project_dir: Path, *, host: str = "0.0.0.0", port: int = 7777) -> None:
     socket_path = project_dir / ".nb.sock"
     if socket_path.exists():
         socket_path.unlink()
@@ -125,9 +133,9 @@ async def main(project_dir: Path, *, host: str = '0.0.0.0', port: int = 7777) ->
 
     # Initialize aiohttp Application
     app = web.Application()
-    app.router.add_get('/stream', stream_handler)
-    app.router.add_get('/', index_handler)
-    app.router.add_static('/', STATIC_DIR)
+    app.router.add_get("/stream", stream_handler)
+    app.router.add_get("/", index_handler)
+    app.router.add_static("/", STATIC_DIR)
 
     # Start Unix Socket Server
     socket_server = await asyncio.start_unix_server(handle_ipc_client, path=str(socket_path))
@@ -138,7 +146,9 @@ async def main(project_dir: Path, *, host: str = '0.0.0.0', port: int = 7777) ->
     site = web.TCPSite(runner_http, host, port)
     await site.start()
 
-    print(f"Daemon started. Unix socket at {socket_path}, HTTP at http://localhost:{port}", flush=True)
+    print(
+        f"Daemon started. Unix socket at {socket_path}, HTTP at http://localhost:{port}", flush=True
+    )
 
     try:
         while True:
@@ -151,6 +161,7 @@ async def main(project_dir: Path, *, host: str = '0.0.0.0', port: int = 7777) ->
         if socket_path.exists():
             socket_path.unlink()
         await runner_http.cleanup()
+
 
 def start_daemon(project_dir: Path) -> None:
     try:

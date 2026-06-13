@@ -8,10 +8,12 @@ import aiohttp
 from pathlib import Path
 import nb.daemon as daemon
 
+
 def unused_tcp_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.bind(("127.0.0.1", 0))
         return sock.getsockname()[1]
+
 
 @pytest.mark.asyncio
 async def test_daemon_lifecycle(tmp_path: Path) -> None:
@@ -46,11 +48,11 @@ async def test_daemon_lifecycle(tmp_path: Path) -> None:
 
     reader, writer = await asyncio.open_unix_connection(str(socket_path))
     req = {"path": str(notebook_path)}
-    writer.write(json.dumps(req).encode('utf-8') + b"\n")
+    writer.write(json.dumps(req).encode("utf-8") + b"\n")
     await writer.drain()
 
     line = await reader.readline()
-    resp = json.loads(line.decode('utf-8'))
+    resp = json.loads(line.decode("utf-8"))
     assert resp["status"] == "ok"
 
     writer.close()

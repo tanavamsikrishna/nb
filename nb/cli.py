@@ -8,9 +8,11 @@ import shutil
 from pathlib import Path
 from nb import daemon
 
+
 @click.group()
 def main() -> None:
     pass
+
 
 @main.command()
 @click.argument("notebook", type=click.Path(exists=True, dir_okay=False, path_type=Path))
@@ -38,10 +40,7 @@ def run(notebook: Path) -> None:
         cmd = [sys.executable, "-m", "nb.cli", "_daemon", str(project_dir)]
         try:
             subprocess.Popen(
-                cmd,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                start_new_session=True
+                cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True
             )
         except Exception as e:
             click.echo(f"Error starting background daemon: {e}", err=True)
@@ -67,14 +66,16 @@ def run(notebook: Path) -> None:
     # Request notebook run
     req = {"path": str(notebook_path)}
     try:
-        s.sendall(json.dumps(req).encode('utf-8') + b"\n")
+        s.sendall(json.dumps(req).encode("utf-8") + b"\n")
         resp_data = s.recv(4096)
         if not resp_data:
             click.echo("Daemon closed connection without response.", err=True)
             sys.exit(1)
-        resp = json.loads(resp_data.decode('utf-8').strip())
+        resp = json.loads(resp_data.decode("utf-8").strip())
         if resp.get("status") == "ok":
-            click.echo(f"Notebook execution requested successfully. View output at http://localhost:7777")
+            click.echo(
+                f"Notebook execution requested successfully. View output at http://localhost:7777"
+            )
         else:
             click.echo(f"Execution failed: {resp.get('message')}", err=True)
             sys.exit(1)
@@ -84,10 +85,12 @@ def run(notebook: Path) -> None:
     finally:
         s.close()
 
+
 @main.command("_daemon", hidden=True)
 @click.argument("project_dir", type=click.Path(exists=True, file_okay=False, path_type=Path))
 def _daemon(project_dir: Path) -> None:
     daemon.start_daemon(project_dir.resolve())
+
 
 @main.command()
 def build_ui() -> None:
@@ -100,7 +103,7 @@ def build_ui() -> None:
         sys.exit(1)
 
     click.echo("Building Svelte UI...")
-    
+
     # Run npm install if node_modules doesn't exist
     node_modules = ui_dir / "node_modules"
     if not node_modules.exists():
@@ -123,5 +126,6 @@ def build_ui() -> None:
     shutil.copytree(dist_dir, static_dir, dirs_exist_ok=True)
     click.echo("Build complete!")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

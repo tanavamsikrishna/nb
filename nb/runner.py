@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Callable, Any, Tuple, List
 import nb.framework as fw
 
+
 @dataclass
 class Cell:
     id: int
@@ -14,6 +15,7 @@ class Cell:
     source_line: int
     code: str
     content_hash: str
+
 
 def _is_empty_or_only_docstring(code: str) -> bool:
     stripped = code.strip()
@@ -25,11 +27,16 @@ def _is_empty_or_only_docstring(code: str) -> bool:
             return True
         if len(tree.body) == 1:
             stmt = tree.body[0]
-            if isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Constant) and isinstance(stmt.value.value, str):
+            if (
+                isinstance(stmt, ast.Expr)
+                and isinstance(stmt.value, ast.Constant)
+                and isinstance(stmt.value.value, str)
+            ):
                 return True
     except Exception:
         pass
     return False
+
 
 def parse_notebook(source: str) -> Tuple[str | None, List[Cell]]:
     # Extract module-level docstring
@@ -54,16 +61,18 @@ def parse_notebook(source: str) -> Tuple[str | None, List[Cell]]:
                 # Skip cell 0 if it contains only the docstring/comments
                 pass
             else:
-                content_hash = hashlib.blake2b(code.encode('utf-8')).hexdigest()
-                cells.append(Cell(
-                    id=cell_id,
-                    label=current_label,
-                    source_line=current_source_line,
-                    code=code,
-                    content_hash=content_hash
-                ))
+                content_hash = hashlib.blake2b(code.encode("utf-8")).hexdigest()
+                cells.append(
+                    Cell(
+                        id=cell_id,
+                        label=current_label,
+                        source_line=current_source_line,
+                        code=code,
+                        content_hash=content_hash,
+                    )
+                )
                 cell_id += 1
-            
+
             current_cell_lines = []
             current_label = stripped[4:].strip()
             current_source_line = idx + 2  # Next line is the start of cell content
@@ -75,25 +84,29 @@ def parse_notebook(source: str) -> Tuple[str | None, List[Cell]]:
     if cell_id == 0 and _is_empty_or_only_docstring(code):
         pass
     else:
-        content_hash = hashlib.blake2b(code.encode('utf-8')).hexdigest()
-        cells.append(Cell(
-            id=cell_id,
-            label=current_label,
-            source_line=current_source_line,
-            code=code,
-            content_hash=content_hash
-        ))
+        content_hash = hashlib.blake2b(code.encode("utf-8")).hexdigest()
+        cells.append(
+            Cell(
+                id=cell_id,
+                label=current_label,
+                source_line=current_source_line,
+                code=code,
+                content_hash=content_hash,
+            )
+        )
         cell_id += 1
 
     # Fallback to single empty cell if empty
     if not cells:
-        cells.append(Cell(
-            id=0,
-            label="",
-            source_line=1,
-            code="",
-            content_hash=hashlib.blake2b(b"").hexdigest()
-        ))
+        cells.append(
+            Cell(
+                id=0,
+                label="",
+                source_line=1,
+                code="",
+                content_hash=hashlib.blake2b(b"").hexdigest(),
+            )
+        )
 
     # Re-index all cells consecutively starting at 0
     for idx, cell in enumerate(cells):
@@ -101,10 +114,11 @@ def parse_notebook(source: str) -> Tuple[str | None, List[Cell]]:
 
     return docstring, cells
 
+
 def wrap_statement_with_timing(stmt: ast.stmt, idx: int) -> List[ast.stmt]:
     tw_var = f"_tw_{idx}"
     tc_var = f"_tc_{idx}"
-    
+
     code_template = f"""
 {tw_var} = _time.perf_counter()
 {tc_var} = _time.process_time()
@@ -120,6 +134,7 @@ finally:
     try_node.body = [stmt]
     return parsed.body
 
+
 def transform_cell_ast(cell_code: str, filename: str) -> ast.Module:
     tree = ast.parse(cell_code, filename=filename)
     new_body = []
@@ -130,23 +145,24 @@ def transform_cell_ast(cell_code: str, filename: str) -> ast.Module:
     ast.fix_missing_locations(tree)
     return tree
 
+
 def run_notebook(path: Path, exec_ns: dict, emit_event: Callable[[str, dict], None]) -> None:
     try:
         with open(path, "r", encoding="utf-8") as f:
             source = f.read()
     except Exception as e:
-        emit_event('run_end', {"status": "error", "error": f"Failed to read file: {e}"})
+        emit_event("run_end", {"status": "error", "error": f"Failed to read file: {e}"})
         return
 
     docstring, cells = parse_notebook(source)
-    
+
     # Emit notebook header
     if docstring is not None:
-        emit_event('notebook_header', {"docstring": docstring})
+        emit_event("notebook_header", {"docstring": docstring})
 
     # Build and emit cell manifest
     cell_manifest = [{"id": cell.id, "content_hash": cell.content_hash} for cell in cells]
-    emit_event('run_start', {"cell_manifest": cell_manifest})
+    emit_event("run_start", {"cell_manifest": cell_manifest})
 
     # Prepare execution namespace
     exec_ns.setdefault("__name__", "__main__")
@@ -157,77 +173,68 @@ def run_notebook(path: Path, exec_ns: dict, emit_event: Callable[[str, dict], No
     exec_ns.setdefault("MD", fw.MD)
     exec_ns.setdefault("HTML", fw.HTML)
     exec_ns.setdefault("Object", fw.Object)
-    exec_ns['_time'] = time
-    
+    exec_ns["_time"] = time
+
     old_emitter = fw._active_emitter
     installed_runner_emitter = old_emitter is None
 
     if installed_runner_emitter:
+
         def runner_emitter(record: fw.DisplayRecord) -> None:
-            emit_event('display_record', {
-                "cell_id": fw._current_cell_id,
-                "type": record.type,
-                "payload": record.payload
-            })
+            emit_event(
+                "display_record",
+                {"cell_id": fw._current_cell_id, "type": record.type, "payload": record.payload},
+            )
 
         fw._active_emitter = runner_emitter
 
     try:
         for cell in cells:
-            emit_event('cell_start', {
-                "cell_id": cell.id,
-                "source_line": cell.source_line,
-                "label": cell.label
-            })
+            emit_event(
+                "cell_start",
+                {"cell_id": cell.id, "source_line": cell.source_line, "label": cell.label},
+            )
 
             # Set active cell ID in framework so that display primitives can tag themselves
             fw._current_cell_id = cell.id
 
             # Initialize statement accumulator variables
-            exec_ns['_cell_wall_accum'] = 0.0
-            exec_ns['_cell_cpu_accum'] = 0.0
+            exec_ns["_cell_wall_accum"] = 0.0
+            exec_ns["_cell_cpu_accum"] = 0.0
 
             try:
                 # Transform cell code to inject statement timing
                 cell_ast = transform_cell_ast(cell.code, str(path))
-                compiled = compile(cell_ast, str(path), 'exec')
+                compiled = compile(cell_ast, str(path), "exec")
 
                 # Execute the cell
                 exec(compiled, exec_ns)
 
                 # Read accumulated times and convert to milliseconds
-                wall_ms = int(exec_ns.get('_cell_wall_accum', 0.0) * 1000)
-                cpu_ms = int(exec_ns.get('_cell_cpu_accum', 0.0) * 1000)
+                wall_ms = int(exec_ns.get("_cell_wall_accum", 0.0) * 1000)
+                cpu_ms = int(exec_ns.get("_cell_cpu_accum", 0.0) * 1000)
 
-                emit_event('cell_end', {
-                    "cell_id": cell.id,
-                    "wall_ms": wall_ms,
-                    "cpu_ms": cpu_ms,
-                    "status": "ok"
-                })
+                emit_event(
+                    "cell_end",
+                    {"cell_id": cell.id, "wall_ms": wall_ms, "cpu_ms": cpu_ms, "status": "ok"},
+                )
             except Exception:
                 # Format and emit traceback as plain text
                 tb = traceback.format_exc()
-                emit_event('display_record', {
-                    "cell_id": cell.id,
-                    "type": "text",
-                    "payload": tb
-                })
+                emit_event("display_record", {"cell_id": cell.id, "type": "text", "payload": tb})
 
-                wall_ms = int(exec_ns.get('_cell_wall_accum', 0.0) * 1000)
-                cpu_ms = int(exec_ns.get('_cell_cpu_accum', 0.0) * 1000)
+                wall_ms = int(exec_ns.get("_cell_wall_accum", 0.0) * 1000)
+                cpu_ms = int(exec_ns.get("_cell_cpu_accum", 0.0) * 1000)
 
-                emit_event('cell_end', {
-                    "cell_id": cell.id,
-                    "wall_ms": wall_ms,
-                    "cpu_ms": cpu_ms,
-                    "status": "error"
-                })
+                emit_event(
+                    "cell_end",
+                    {"cell_id": cell.id, "wall_ms": wall_ms, "cpu_ms": cpu_ms, "status": "error"},
+                )
 
-                emit_event('run_end', {"status": "error"})
+                emit_event("run_end", {"status": "error"})
                 return
 
-        emit_event('run_end', {"status": "ok"})
+        emit_event("run_end", {"status": "ok"})
     finally:
         fw._current_cell_id = None
         if installed_runner_emitter:
