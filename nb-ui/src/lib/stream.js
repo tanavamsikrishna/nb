@@ -1,4 +1,8 @@
+import { getDb } from './duckdb.js';
 import { cells, notebookHeader, connectionStatus } from '../stores/cells.js';
+
+// Pre-warm DuckDB-WASM in background (~8MB lazy load, cached after first load)
+getDb();
 
 let eventSource = null;
 
