@@ -55,12 +55,13 @@ class Object:
 @dataclass
 class Table:
     """Wrapper for Polars DataFrames to enable interactive table display."""
+
     df: Any  # pl.DataFrame — typed as Any to avoid hard import at module level
 
 
 def _serialize_table(obj: Table) -> dict:
-    import io
     import base64
+    import io
 
     buf = io.BytesIO()
     obj.df.write_parquet(buf, compression="snappy")
