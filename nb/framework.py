@@ -109,7 +109,7 @@ def _create_display_record(obj: Any) -> DisplayRecord:
         import polars as pl
 
         if isinstance(obj, pl.DataFrame):
-            return DisplayRecord(type="html", payload=obj._repr_html_())
+            return _create_display_record(Table(obj))
     except ImportError:
         pass
 

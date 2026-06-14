@@ -17,7 +17,7 @@
 <script>
   const MAX_DISPLAY_ROWS = 25;
 
-  let { conn, viewName, totalRows } = $props();
+  const { conn, viewName, totalRows } = $props();
 
   const defaultSql = `SELECT * FROM ${viewName} `;
   let sql = $state(defaultSql);
