@@ -208,7 +208,7 @@ def _check_purity(code: types.CodeType, func_name: str) -> None:
             _check_purity(instr.argval, func_name)
 
 
-def nb_cache(func: F = None, *, keys: list[str] | None = None) -> F:
+def nb_cache(func: F | None = None, *, keys: list[str] | None = None) -> F:
     def decorator(func: F) -> F:
         # Run purity linter before wrapping
         _check_purity(func.__code__, func.__name__)

@@ -10,7 +10,6 @@ This notebook demonstrates the capabilities of the `nb` execution and display fr
 
 # %%
 
-import functools
 import time
 from datetime import date
 
@@ -57,7 +56,7 @@ display(MD("**Hello**"))
 WINDOW = 3
 
 
-@functools.partial(nb_cache, keys=["WINDOW"])
+@nb_cache(keys=["WINDOW"])
 def expensive_computation(x):
     display(MD(f"Calculating for x={x} (this should only run on cache miss)..."))
     time.sleep(1)  # simulate slow task
