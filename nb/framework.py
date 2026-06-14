@@ -52,6 +52,24 @@ class Object:
         self.obj = obj
 
 
+@dataclass
+class Table:
+    """Wrapper for Polars DataFrames to enable interactive table display."""
+    df: Any  # pl.DataFrame — typed as Any to avoid hard import at module level
+
+
+def _serialize_table(obj: Table) -> dict:
+    import io
+    import base64
+
+    buf = io.BytesIO()
+    obj.df.write_parquet(buf, compression="snappy")
+    return {
+        "data": base64.b64encode(buf.getvalue()).decode(),
+        "total_rows": len(obj.df),
+    }
+
+
 def _serialize_object(obj: Any) -> Any:
     if hasattr(obj, "model_dump") and callable(obj.model_dump):
         obj = obj.model_dump()
@@ -81,7 +99,11 @@ def _create_display_record(obj: Any) -> DisplayRecord:
     except (ImportError, AttributeError):
         pass
 
-    # 3. Polars
+    # 3. Table wrapper (must come before plain Polars DataFrame)
+    if isinstance(obj, Table):
+        return DisplayRecord(type="table", payload=_serialize_table(obj))
+
+    # 4. Polars
     try:
         import polars as pl
 
@@ -90,15 +112,15 @@ def _create_display_record(obj: Any) -> DisplayRecord:
     except ImportError:
         pass
 
-    # 4. MD Wrapper
+    # 5. MD Wrapper
     if isinstance(obj, MD):
         return DisplayRecord(type="md", payload=obj.text)
 
-    # 5. HTML Wrapper
+    # 6. HTML Wrapper
     if isinstance(obj, HTML):
         return DisplayRecord(type="html", payload=obj.text)
 
-    # 6. Object Wrapper
+    # 7. Object Wrapper
     if isinstance(obj, Object):
         return DisplayRecord(type="object", payload=_serialize_object(obj.obj))
 
