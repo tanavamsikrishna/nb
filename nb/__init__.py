@@ -2,6 +2,7 @@ from nb.framework import (
     HTML,
     MD,
     Object,
+    Table,
     _cache,
     clear_cache,
     display,
@@ -15,5 +16,6 @@ __all__ = [
     "MD",
     "HTML",
     "Object",
+    "Table",
     "_cache",
 ]
