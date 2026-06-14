@@ -74,5 +74,6 @@ display(f"Result 2: {res2}")
 
 # %% Cell 5: Plotly Display
 
-fig = px.bar(x=["A", "B", "C"], y=[10, 20, 15], title="Sample Bar Chart")
+df = pl.DataFrame({"x": ["A", "B", "C"], "y": [10, 20, 15]})
+fig = px.bar(df, x="x", y="y", title="Sample Bar Chart")
 display(fig)

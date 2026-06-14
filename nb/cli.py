@@ -111,18 +111,18 @@ def build_ui() -> None:
 
     click.echo("Building Svelte UI...")
 
-    # Run npm install if node_modules doesn't exist
+    # Run pnpm install if node_modules doesn't exist
     node_modules = ui_dir / "node_modules"
     if not node_modules.exists():
-        click.echo("Running npm install...")
-        res = subprocess.run(["npm", "install"], cwd=str(ui_dir))
+        click.echo("Running pnpm install...")
+        res = subprocess.run(["pnpm", "install"], cwd=str(ui_dir))
         if res.returncode != 0:
-            click.echo("npm install failed", err=True)
+            click.echo("pnpm install failed", err=True)
             sys.exit(1)
 
-    res = subprocess.run(["npm", "run", "build"], cwd=str(ui_dir))
+    res = subprocess.run(["pnpm", "build"], cwd=str(ui_dir))
     if res.returncode != 0:
-        click.echo("npm run build failed", err=True)
+        click.echo("pnpm build failed", err=True)
         sys.exit(1)
 
     click.echo(f"Copying build artifacts to {static_dir}...")

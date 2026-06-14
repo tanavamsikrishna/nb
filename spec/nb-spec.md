@@ -422,7 +422,7 @@ repo/
 
 ```makefile
 build-ui:
-    cd nb-ui && npm run build
+    cd nb-ui && pnpm build
 
 build: build-ui
     cp -r nb-ui/dist/* nb/static/

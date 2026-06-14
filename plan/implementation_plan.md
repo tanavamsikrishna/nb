@@ -59,7 +59,7 @@ This is a cross-cutting design decision that affects `framework.py`, the fronten
 
 #### [NEW] [Makefile](file:///Users/vamsi/repo/nb/Makefile)
 
-- `build-ui` target: `cd nb-ui && npm run build`
+- `build-ui` target: `cd nb-ui && pnpm build`
 - `build` target: `build-ui` + `cp -r nb-ui/dist/* nb/static/` + `pip install .`
 
 #### [MODIFY] [.gitignore](file:///Users/vamsi/repo/nb/.gitignore)
@@ -195,7 +195,7 @@ nb build-ui              Run vite build and copy dist → nb/static/.
 - **`nb run`**: Resolves `.nb.sock` as `Path(notebook).parent / ".nb.sock"`. Connects to socket, sends path, receives ack.
 - **Daemon auto-start**: If socket doesn't exist or connection refused, spawn `nb _daemon <project_dir>` as a detached background subprocess, poll until socket appears (max ~3s), then send run request.
 - **`nb _daemon`** (internal): Hidden click command that starts the daemon; invoked only by auto-start.
-- **`nb build-ui`**: Shells out to `cd nb-ui && npm run build`, then copies `nb-ui/dist/*` → `nb/static/`.
+- **`nb build-ui`**: Shells out to `cd nb-ui && pnpm build`, then copies `nb-ui/dist/*` → `nb/static/`.
 
 ---
 

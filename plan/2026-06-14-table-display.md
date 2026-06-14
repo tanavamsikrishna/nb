@@ -148,7 +148,7 @@ git commit -m "feat: add Table wrapper with Parquet serialization"
 
 - [ ] **Step 1: Install DuckDB-WASM**
 
-Run: `cd /Users/vamsi/repo/nb/nb-ui && npm install @duckdb/duckdb-wasm`
+Run: `cd /Users/vamsi/repo/nb/nb-ui && pnpm add @duckdb/duckdb-wasm`
 
 Verify `package.json` now contains `"@duckdb/duckdb-wasm"` in dependencies.
 
@@ -176,7 +176,7 @@ export default defineConfig({
 
 - [ ] **Step 3: Verify dev server starts**
 
-Run: `cd /Users/vamsi/repo/nb/nb-ui && timeout 5 npm run dev || true`
+Run: `cd /Users/vamsi/repo/nb/nb-ui && timeout 5 pnpm dev || true`
 Expected: Vite starts without DuckDB-related errors (timeout is intentional — just checking startup)
 
 - [ ] **Step 4: Commit**
@@ -908,7 +908,7 @@ So the full modification to the `{#each}` block is:
 
 - [ ] **Step 3: Verify build**
 
-Run: `cd /Users/vamsi/repo/nb/nb-ui && npm run build 2>&1 | tail -10`
+Run: `cd /Users/vamsi/repo/nb/nb-ui && pnpm build 2>&1 | tail -10`
 Expected: Build succeeds with no errors.
 
 - [ ] **Step 4: Commit**
