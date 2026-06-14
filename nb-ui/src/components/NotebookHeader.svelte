@@ -1,11 +1,11 @@
 <script>
-  import { marked } from 'marked';
-  
+  import { marked } from "marked";
+
   // Svelte 5 props
-  let { docstring = '' } = $props();
-  
+  let { docstring = "" } = $props();
+
   // Svelte 5 derived state
-  let html = $derived(docstring ? marked.parse(docstring) : '');
+  let html = $derived(docstring ? marked.parse(docstring) : "");
 </script>
 
 <div class="notebook-header">
@@ -51,7 +51,7 @@
   }
 
   .notebook-header :global(code) {
-    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
     background: rgba(15, 23, 42, 0.6);
     padding: 3px 6px;
     border-radius: 6px;

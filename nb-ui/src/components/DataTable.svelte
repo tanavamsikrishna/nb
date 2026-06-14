@@ -15,30 +15,32 @@
   Constraints: Must be used inside Cell.svelte where cellId and recordIndex are available.
 -->
 <script>
-  import { onDestroy } from 'svelte';
-  import { getDb }     from '$lib/duckdb.js';
-  import DataTableView from './DataTableView.svelte';
+  import { onDestroy } from "svelte";
+  import { getDb } from "$lib/duckdb.js";
+  import DataTableView from "./DataTableView.svelte";
 
   let { payload, cellId, recordIndex } = $props();
 
   const viewName = `t_${cellId}_${recordIndex}`;
-  const bufName  = `_nb_${viewName}.parquet`;
+  const bufName = `_nb_${viewName}.parquet`;
 
   let conn = $state(null);
 
   const ready = getDb().then(async (db) => {
-      const buf = Uint8Array.from(atob(payload.data), c => c.charCodeAt(0));
-      await db.registerFileBuffer(bufName, buf);
-      conn = await db.connect();
-      await conn.query(`CREATE OR REPLACE VIEW "${viewName}" AS FROM '${bufName}'`);
-      return conn;
+    const buf = Uint8Array.from(atob(payload.data), (c) => c.charCodeAt(0));
+    await db.registerFileBuffer(bufName, buf);
+    conn = await db.connect();
+    await conn.query(
+      `CREATE OR REPLACE VIEW "${viewName}" AS FROM '${bufName}'`,
+    );
+    return conn;
   });
 
   onDestroy(async () => {
-      if (conn) {
-          await conn.query(`DROP VIEW IF EXISTS "${viewName}"`);
-          await conn.close();
-      }
+    if (conn) {
+      await conn.query(`DROP VIEW IF EXISTS "${viewName}"`);
+      await conn.close();
+    }
   });
 </script>
 
@@ -52,16 +54,16 @@
 
 <style>
   .db-loading {
-      font-size: 0.85rem;
-      color: #64748b;
-      font-style: italic;
-      padding: 8px 0;
+    font-size: 0.85rem;
+    color: #64748b;
+    font-style: italic;
+    padding: 8px 0;
   }
 
   .db-error {
-      font-size: 0.85rem;
-      color: #f87171;
-      font-weight: 500;
-      padding: 8px 0;
+    font-size: 0.85rem;
+    color: #f87171;
+    font-weight: 500;
+    padding: 8px 0;
   }
 </style>

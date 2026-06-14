@@ -1,8 +1,8 @@
 <script>
-  import { marked } from 'marked';
-  import JSONTree from './JSONTree.svelte';
-  import DataTable from './DataTable.svelte';
-  import { loadPlotly, loadVega } from '../lib/lazy_load.js';
+  import { marked } from "marked";
+  import JSONTree from "./JSONTree.svelte";
+  import DataTable from "./DataTable.svelte";
+  import { loadPlotly, loadVega } from "../lib/lazy_load.js";
 
   // Svelte 5 props
   let { cell } = $props();
@@ -11,12 +11,17 @@
   function plotlyAction(node, payload) {
     let active = true;
     loadPlotly()
-      .then(Plotly => {
+      .then((Plotly) => {
         if (active) {
-          Plotly.newPlot(node, payload.data, payload.layout, payload.config || {});
+          Plotly.newPlot(
+            node,
+            payload.data,
+            payload.layout,
+            payload.config || {},
+          );
         }
       })
-      .catch(err => {
+      .catch((err) => {
         if (active) {
           node.innerHTML = `<span class="error-msg">Failed to render Plotly: ${err.message || err}</span>`;
         }
@@ -25,19 +30,19 @@
     return {
       destroy() {
         active = false;
-      }
+      },
     };
   }
 
   function altairAction(node, payload) {
     let active = true;
     loadVega()
-      .then(vegaEmbed => {
+      .then((vegaEmbed) => {
         if (active) {
           vegaEmbed(node, payload, { actions: false });
         }
       })
-      .catch(err => {
+      .catch((err) => {
         if (active) {
           node.innerHTML = `<span class="error-msg">Failed to render Altair: ${err.message || err}</span>`;
         }
@@ -46,12 +51,16 @@
     return {
       destroy() {
         active = false;
-      }
+      },
     };
   }
 </script>
 
-<div class="cell-container {cell.status} {cell.stale ? 'stale' : ''} {cell.absent ? 'absent' : ''}">
+<div
+  class="cell-container {cell.status} {cell.stale ? 'stale' : ''} {cell.absent
+    ? 'absent'
+    : ''}"
+>
   <!-- Cell Header / Status Bar -->
   <div class="cell-header">
     <div class="left-header">
@@ -64,20 +73,40 @@
         <span class="stale-badge">Stale</span>
       {/if}
     </div>
-    
+
     {#if cell.profiling}
       <div class="profiling-stats">
         <span class="stat-item">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="icon">
-            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.5-13a.75.75 0 00-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 000-1.5h-3.25V5z" clip-rule="evenodd" />
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+            class="icon"
+          >
+            <path
+              fill-rule="evenodd"
+              d="M10 18a8 8 0 100-16 8 8 0 000 16zm.5-13a.75.75 0 00-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 000-1.5h-3.25V5z"
+              clip-rule="evenodd"
+            />
           </svg>
           {cell.profiling.wall_ms}ms wall
         </span>
         <span class="stat-divider">•</span>
         <span class="stat-item">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="icon">
-            <path d="M12 9a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1V9z" />
-            <path fill-rule="evenodd" d="M19.307 2.193a.75.75 0 00-1.147-.193l-3.58 3.033A2.247 2.247 0 0013.25 5H6.75A2.25 2.25 0 004.5 7.25v5.5A2.25 2.25 0 006.75 15h6.5a2.24 2.24 0 001.33-.433l3.58 3.033a.75.75 0 001.147-.193c.12-.224.08-.502-.103-.686l-2.029-2.03A3.722 3.722 0 0018 12.75v-5.5c0-1.042-.435-1.983-1.135-2.656l2.029-2.03a.75.75 0 00.413-.671zM15 7.25v5.5a.75.75 0 01-.75.75h-6.5a.75.75 0 01-.75-.75v-5.5a.75.75 0 01.75-.75h6.5a.75.75 0 01.75.75z" clip-rule="evenodd" />
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+            class="icon"
+          >
+            <path
+              d="M12 9a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1V9z"
+            />
+            <path
+              fill-rule="evenodd"
+              d="M19.307 2.193a.75.75 0 00-1.147-.193l-3.58 3.033A2.247 2.247 0 0013.25 5H6.75A2.25 2.25 0 004.5 7.25v5.5A2.25 2.25 0 006.75 15h6.5a2.24 2.24 0 001.33-.433l3.58 3.033a.75.75 0 001.147-.193c.12-.224.08-.502-.103-.686l-2.029-2.03A3.722 3.722 0 0018 12.75v-5.5c0-1.042-.435-1.983-1.135-2.656l2.029-2.03a.75.75 0 00.413-.671zM15 7.25v5.5a.75.75 0 01-.75.75h-6.5a.75.75 0 01-.75-.75v-5.5a.75.75 0 01.75-.75h6.5a.75.75 0 01.75.75z"
+              clip-rule="evenodd"
+            />
           </svg>
           {cell.profiling.cpu_ms}ms cpu
         </span>
@@ -89,36 +118,36 @@
   <div class="cell-outputs">
     {#each cell.records as record, i}
       <div class="output-item">
-        {#if record.type === 'md'}
+        {#if record.type === "md"}
           <div class="markdown-output">
             {@html marked.parse(record.payload)}
           </div>
-        {:else if record.type === 'table'}
+        {:else if record.type === "table"}
           <DataTable
             payload={record.payload}
             cellId={cell.id}
             recordIndex={i}
           />
-        {:else if record.type === 'html'}
+        {:else if record.type === "html"}
           <div class="html-output">
             {@html record.payload}
           </div>
-        {:else if record.type === 'plotly'}
+        {:else if record.type === "plotly"}
           <div class="plotly-output" use:plotlyAction={record.payload}></div>
-        {:else if record.type === 'altair'}
+        {:else if record.type === "altair"}
           <div class="altair-output" use:altairAction={record.payload}></div>
-        {:else if record.type === 'object'}
+        {:else if record.type === "object"}
           <div class="object-output">
             <JSONTree val={record.payload} />
           </div>
-        {:else if record.type === 'text'}
+        {:else if record.type === "text"}
           <pre class="text-output">{record.payload}</pre>
         {/if}
       </div>
     {:else}
-      {#if cell.status === 'pending'}
+      {#if cell.status === "pending"}
         <div class="placeholder-msg">Waiting for execution...</div>
-      {:else if cell.status === 'running' && cell.records.length === 0}
+      {:else if cell.status === "running" && cell.records.length === 0}
         <div class="placeholder-msg pulsing">Running cell...</div>
       {/if}
     {/each}
@@ -134,8 +163,13 @@
     border-radius: 12px;
     margin-bottom: 20px;
     overflow: hidden;
-    transition: border-color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    transition:
+      border-color 0.3s ease,
+      box-shadow 0.3s ease,
+      opacity 0.3s ease;
+    box-shadow:
+      0 4px 6px -1px rgba(0, 0, 0, 0.1),
+      0 2px 4px -1px rgba(0, 0, 0, 0.06);
   }
 
   .cell-container:hover {
@@ -147,7 +181,7 @@
     border-color: rgba(99, 102, 241, 0.6);
     box-shadow: 0 0 15px rgba(99, 102, 241, 0.2);
   }
-  
+
   .cell-container.error {
     border-color: rgba(239, 68, 68, 0.5);
     box-shadow: 0 0 15px rgba(239, 68, 68, 0.15);
@@ -185,7 +219,9 @@
     height: 8px;
     border-radius: 50%;
     background-color: #64748b;
-    transition: background-color 0.3s ease, box-shadow 0.3s ease;
+    transition:
+      background-color 0.3s ease,
+      box-shadow 0.3s ease;
   }
 
   .cell-container.pending .status-indicator {
@@ -284,7 +320,7 @@
   /* Plain text rendering */
   .text-output {
     margin: 0;
-    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
     font-size: 0.875rem;
     color: #cbd5e1;
     background: rgba(15, 23, 42, 0.5);
@@ -321,7 +357,7 @@
   }
 
   .markdown-output :global(code) {
-    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
     font-size: 0.85em;
     background: rgba(0, 0, 0, 0.2);
     padding: 2px 4px;
@@ -367,7 +403,8 @@
     background: rgba(255, 255, 255, 0.02);
   }
 
-  .plotly-output, .altair-output {
+  .plotly-output,
+  .altair-output {
     background: rgba(255, 255, 255, 0.01);
     border: 1px solid rgba(255, 255, 255, 0.04);
     border-radius: 8px;

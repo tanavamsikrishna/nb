@@ -1,7 +1,7 @@
 <script>
-  import JSONTree from './JSONTree.svelte';
+  import JSONTree from "./JSONTree.svelte";
 
-  let { val, label = '', depth = 0, isLast = true } = $props();
+  let { val, label = "", depth = 0, isLast = true } = $props();
 
   /* svelte-ignore state_referenced_locally */
   let expanded = $state(depth < 2);
@@ -11,9 +11,11 @@
     expanded = !expanded;
   }
 
-  let type = $derived(val === null ? 'null' : Array.isArray(val) ? 'array' : typeof val);
-  let isObjectOrArray = $derived(type === 'object' || type === 'array');
-  let keys = $derived(type === 'object' ? Object.keys(val) : []);
+  let type = $derived(
+    val === null ? "null" : Array.isArray(val) ? "array" : typeof val,
+  );
+  let isObjectOrArray = $derived(type === "object" || type === "array");
+  let keys = $derived(type === "object" ? Object.keys(val) : []);
 </script>
 
 <div class="json-node" style="margin-left: {depth * 14}px">
@@ -27,20 +29,25 @@
     <span class="key">"{label}"</span><span class="colon">: </span>
   {/if}
 
-  {#if type === 'object'}
+  {#if type === "object"}
     <span class="brace">{"{"}</span>
     {#if expanded}
       <div class="nested">
         {#each keys as key, idx (key)}
-          <JSONTree val={val[key]} label={key} depth={0} isLast={idx === keys.length - 1} />
+          <JSONTree
+            val={val[key]}
+            label={key}
+            depth={0}
+            isLast={idx === keys.length - 1}
+          />
         {/each}
       </div>
-      <span class="brace">{"}"}{isLast ? '' : ','}</span>
+      <span class="brace">{"}"}{isLast ? "" : ","}</span>
     {:else}
       <button class="collapsed-preview" onclick={toggle}>...</button>
-      <span class="brace">{"}"}{isLast ? '' : ','}</span>
+      <span class="brace">{"}"}{isLast ? "" : ","}</span>
     {/if}
-  {:else if type === 'array'}
+  {:else if type === "array"}
     <span class="brace">{"["}</span>
     {#if expanded}
       <div class="nested">
@@ -48,27 +55,27 @@
           <JSONTree val={item} depth={0} isLast={idx === val.length - 1} />
         {/each}
       </div>
-      <span class="brace">{"]"}{isLast ? '' : ','}</span>
+      <span class="brace">{"]"}{isLast ? "" : ","}</span>
     {:else}
       <button class="collapsed-preview" onclick={toggle}>...</button>
-      <span class="brace">{"]"}{isLast ? '' : ','}</span>
+      <span class="brace">{"]"}{isLast ? "" : ","}</span>
     {/if}
-  {:else if type === 'string'}
-    <span class="string">"{val}"</span>{isLast ? '' : ','}
-  {:else if type === 'number'}
-    <span class="number">{val}</span>{isLast ? '' : ','}
-  {:else if type === 'boolean'}
-    <span class="boolean">{val}</span>{isLast ? '' : ','}
-  {:else if type === 'null'}
-    <span class="null">null</span>{isLast ? '' : ','}
+  {:else if type === "string"}
+    <span class="string">"{val}"</span>{isLast ? "" : ","}
+  {:else if type === "number"}
+    <span class="number">{val}</span>{isLast ? "" : ","}
+  {:else if type === "boolean"}
+    <span class="boolean">{val}</span>{isLast ? "" : ","}
+  {:else if type === "null"}
+    <span class="null">null</span>{isLast ? "" : ","}
   {:else}
-    <span class="other">{val}</span>{isLast ? '' : ','}
+    <span class="other">{val}</span>{isLast ? "" : ","}
   {/if}
 </div>
 
 <style>
   .json-node {
-    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
     font-size: 0.875rem;
     line-height: 1.6;
     color: #e2e8f0;

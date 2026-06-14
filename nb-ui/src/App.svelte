@@ -1,9 +1,9 @@
 <script>
-  import { onMount } from 'svelte';
-  import { cells, notebookHeader, connectionStatus } from './stores/cells.js';
-  import { connectStream } from './lib/stream.js';
-  import NotebookHeader from './components/NotebookHeader.svelte';
-  import Cell from './components/Cell.svelte';
+  import { onMount } from "svelte";
+  import { cells, notebookHeader, connectionStatus } from "./stores/cells.js";
+  import { connectStream } from "./lib/stream.js";
+  import NotebookHeader from "./components/NotebookHeader.svelte";
+  import Cell from "./components/Cell.svelte";
 
   onMount(() => {
     connectStream();
@@ -23,9 +23,9 @@
       <div class="status-badge {$connectionStatus}">
         <span class="badge-dot"></span>
         <span class="badge-text">
-          {#if $connectionStatus === 'connected'}
+          {#if $connectionStatus === "connected"}
             connected to daemon
-          {:else if $connectionStatus === 'connecting'}
+          {:else if $connectionStatus === "connecting"}
             connecting...
           {:else}
             disconnected
@@ -47,13 +47,29 @@
       {:else}
         <div class="empty-state">
           <div class="empty-icon-wrap">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="empty-icon">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5" />
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke-width="1.5"
+              stroke="currentColor"
+              class="empty-icon"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5"
+              />
             </svg>
           </div>
           <h2>No Active Notebook Stream</h2>
-          <p>The UI is waiting for a notebook execution. Start a run using the command line:</p>
-          <code class="cmd-example">nb run <span class="arg">my_notebook.py</span></code>
+          <p>
+            The UI is waiting for a notebook execution. Start a run using the
+            command line:
+          </p>
+          <code class="cmd-example"
+            >nb run <span class="arg">my_notebook.py</span></code
+          >
         </div>
       {/each}
     </div>
@@ -64,12 +80,33 @@
   :global(body) {
     background-color: #0b0f19;
     color: #f1f5f9;
-    font-family: 'Outfit', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    font-family:
+      "Outfit",
+      "Inter",
+      -apple-system,
+      BlinkMacSystemFont,
+      "Segoe UI",
+      Roboto,
+      Oxygen,
+      Ubuntu,
+      Cantarell,
+      "Open Sans",
+      "Helvetica Neue",
+      sans-serif;
     margin: 0;
     padding: 0;
     min-height: 100vh;
-    background-image: radial-gradient(circle at top right, rgba(99, 102, 241, 0.08), transparent 450px),
-                      radial-gradient(circle at bottom left, rgba(192, 132, 252, 0.05), transparent 400px);
+    background-image:
+      radial-gradient(
+        circle at top right,
+        rgba(99, 102, 241, 0.08),
+        transparent 450px
+      ),
+      radial-gradient(
+        circle at bottom left,
+        rgba(192, 132, 252, 0.05),
+        transparent 400px
+      );
     background-attachment: fixed;
   }
 
@@ -243,7 +280,7 @@
   }
 
   .cmd-example {
-    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
     font-size: 0.9rem;
     background: #0f172a;
     border: 1px solid rgba(255, 255, 255, 0.08);

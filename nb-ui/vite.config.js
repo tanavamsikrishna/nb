@@ -1,21 +1,21 @@
-import { defineConfig } from 'vite'
-import { svelte } from '@sveltejs/vite-plugin-svelte'
-import path from 'path'
+import { defineConfig } from "vite";
+import { svelte } from "@sveltejs/vite-plugin-svelte";
+import path from "path";
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [svelte()],
   resolve: {
     alias: {
-      '$lib': path.resolve('./src/lib')
-    }
+      $lib: path.resolve("./src/lib"),
+    },
   },
   optimizeDeps: {
-    exclude: ['@duckdb/duckdb-wasm']
+    exclude: ["@duckdb/duckdb-wasm"],
   },
   server: {
     proxy: {
-      '/stream': 'http://localhost:7777'
-    }
-  }
-})
+      "/stream": "http://localhost:7777",
+    },
+  },
+});
