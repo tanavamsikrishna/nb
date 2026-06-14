@@ -1,6 +1,7 @@
 <script>
   import { marked } from 'marked';
   import JSONTree from './JSONTree.svelte';
+  import DataTable from './DataTable.svelte';
   import { loadPlotly, loadVega } from '../lib/lazy_load.js';
 
   // Svelte 5 props
@@ -86,12 +87,18 @@
 
   <!-- Cell Outputs -->
   <div class="cell-outputs">
-    {#each cell.records as record}
+    {#each cell.records as record, i}
       <div class="output-item">
         {#if record.type === 'md'}
           <div class="markdown-output">
             {@html marked.parse(record.payload)}
           </div>
+        {:else if record.type === 'table'}
+          <DataTable
+            payload={record.payload}
+            cellId={cell.id}
+            recordIndex={i}
+          />
         {:else if record.type === 'html'}
           <div class="html-output">
             {@html record.payload}
