@@ -5,24 +5,24 @@ description = "A lightweight Python notebook runner"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "aiohttp",
-    "click",
+  "aiohttp",
+  "click",
 ]
-
-[project.optional-dependencies]
-dev = [
-    "pytest",
-    "pytest-asyncio",
-]
-polars = ["polars"]
-numpy = ["numpy"]
-pydantic = ["pydantic"]
-plotly = ["plotly"]
-altair = ["altair"]
-all = ["polars", "numpy", "pydantic", "plotly", "altair"]
 
 [project.scripts]
 nb = "nb.cli:main"
+
+[project.optional-dependencies]
+all = ["polars", "numpy", "pydantic", "plotly", "altair"]
+altair = ["altair"]
+dev = [
+  "pytest",
+  "pytest-asyncio",
+]
+numpy = ["numpy"]
+plotly = ["plotly"]
+polars = ["polars"]
+pydantic = ["pydantic"]
 
 [build-system]
 requires = ["hatchling"]

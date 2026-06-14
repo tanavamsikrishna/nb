@@ -1,9 +1,10 @@
 import asyncio
 import json
-import sys
 from pathlib import Path
 from typing import Set
+
 from aiohttp import web
+
 import nb.framework as fw
 from nb import runner
 

@@ -12,21 +12,35 @@ This notebook demonstrates the capabilities of the `nb` execution and display fr
 
 import functools
 import time
+from datetime import date
+
+import plotly.express as px
+import polars as pl
 
 from nb import HTML, MD, Object, display, nb_cache
 
 # %% Cell 1: Introduction
-display(MD("### Welcome to the `nb` runner!"))
+display(MD("# Welcome to the `nb` runner!"))
 display(HTML("<p style='color: #2563eb;'>This HTML text is styled directly.</p>"))
 
-display("Hello")
-time.sleep(1)
-display("Hello")
-time.sleep(1)
-display("Hello")
-time.sleep(1)
-display("Hello")
-time.sleep(1)
+display(MD("## Sample numpy"))
+# Generate mock sample data
+df = pl.DataFrame(
+    {
+        "id": [1, 2, 3, 4, 5],
+        "name": ["Alice", "Bob", "Charlie", "David", "Eve"],
+        "age": [25, 30, 35, 40, 45],
+        "joined_date": [
+            date(2025, 1, 15),
+            date(2025, 3, 22),
+            date(2025, 5, 10),
+            date(2026, 2, 18),
+            date(2026, 6, 1),
+        ],
+        "is_active": [True, False, True, True, False],
+    }
+)
+display(pl.concat([df] * 10))
 
 # %% Cell 2: Collapsible Object Wrapper
 my_data = {
@@ -57,3 +71,9 @@ display(f"Result 1: {res1}")
 # This call should hit the cache, replay the md display record instantly, and return 30 without sleeping
 res2 = expensive_computation(10)
 display(f"Result 2: {res2}")
+
+
+# %% Cell 5: Plotly Display
+
+fig = px.bar(x=["A", "B", "C"], y=[10, 20, 15], title="Sample Bar Chart")
+display(fig)

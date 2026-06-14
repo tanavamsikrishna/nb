@@ -10,6 +10,8 @@ import click
 
 from nb import daemon
 
+NOTEBOOK_URL = "http://localhost:7777"
+
 
 @click.group()
 def main() -> None:
@@ -64,6 +66,11 @@ def run(notebook: Path) -> None:
         if not connected:
             click.echo("Failed to start daemon or connect to socket within 3 seconds.", err=True)
             sys.exit(1)
+        else:
+            import webbrowser
+
+            webbrowser.open(NOTEBOOK_URL)
+            time.sleep(0.5)
 
     # Request notebook run
     req = {"path": str(notebook_path)}
@@ -75,9 +82,7 @@ def run(notebook: Path) -> None:
             sys.exit(1)
         resp = json.loads(resp_data.decode("utf-8").strip())
         if resp.get("status") == "ok":
-            click.echo(
-                "Notebook execution requested successfully. View output at http://localhost:7777"
-            )
+            click.echo(f"Notebook execution requested successfully. View output at {NOTEBOOK_URL}")
         else:
             click.echo(f"Execution failed: {resp.get('message')}", err=True)
             sys.exit(1)

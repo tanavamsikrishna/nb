@@ -1,12 +1,12 @@
-import types
-import inspect
 import dis
-import pickle
 import hashlib
+import inspect
 import json
+import pickle
+import types
 from dataclasses import dataclass
-from typing import Any, Callable, TypeVar, cast
 from functools import wraps
+from typing import Any, Callable, TypeVar, cast
 
 F = TypeVar("F", bound=Callable)
 
@@ -86,7 +86,7 @@ def _create_display_record(obj: Any) -> DisplayRecord:
         import polars as pl
 
         if isinstance(obj, pl.DataFrame):
-            return DisplayRecord(type="html", payload=obj.to_html())
+            return DisplayRecord(type="html", payload=obj._repr_html_())
     except ImportError:
         pass
 
