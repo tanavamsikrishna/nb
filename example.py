@@ -16,7 +16,7 @@ from datetime import date
 import plotly.express as px
 import polars as pl
 
-from nb import HTML, MD, Object, display, nb_cache
+from nb import HTML, MD, Object, Table, display, nb_cache
 
 # %% Cell 1: Introduction
 display(MD("# Welcome to the `nb` runner!"))
@@ -39,7 +39,7 @@ df = pl.DataFrame(
         "is_active": [True, False, True, True, False],
     }
 )
-display(pl.concat([df] * 10))
+display(Table(pl.concat([df] * 10)))
 
 # %% Cell 2: Collapsible Object Wrapper
 my_data = {

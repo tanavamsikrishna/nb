@@ -1,9 +1,8 @@
-.PHONY: build-ui build
+.PHONY: install build
 
-build-ui:
-	cd nb-ui && pnpm build
+install:
+	pip install .
 
-build: build-ui
-	mkdir -p nb/static
-	cp -r nb-ui/dist/* nb/static/
+build:
+	uv run nb build-ui
 	pip install .
