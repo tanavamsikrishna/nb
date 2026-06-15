@@ -1,3 +1,23 @@
+<!--
+  Cell.svelte — Single notebook cell with status header and output renderer.
+
+  Displays a cell's status (pending/running/done/error), optional profiling
+  stats, and renders all output records (markdown, table, HTML, Plotly,
+  Altair, JSON object, plain text).
+
+  Props:
+    cell  Object  — cell data from the cells store (id, status, records, profiling, etc.)
+
+  Dependencies:
+    - marked            (markdown → HTML)
+    - JSONTree.svelte   (recursive object renderer)
+    - DataTable.svelte  (DuckDB-backed table viewer)
+    - lib/lazy_load.js  (loadPlotly, loadVega — deferred heavy libs)
+
+  Exports: None (render-only component).
+  Side-effects: Lazy-loads Plotly/Vega on first use via Svelte actions.
+  Constraints: Svelte 5 runes ($props, $state, $derived).
+-->
 <script>
   import { marked } from "marked";
   import JSONTree from "./JSONTree.svelte";
@@ -156,40 +176,36 @@
 
 <style>
   .cell-container {
-    background: rgba(30, 41, 59, 0.4);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 12px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
     margin-bottom: 20px;
     overflow: hidden;
     transition:
       border-color 0.3s ease,
       box-shadow 0.3s ease,
       opacity 0.3s ease;
-    box-shadow:
-      0 4px 6px -1px rgba(0, 0, 0, 0.1),
-      0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    box-shadow: var(--shadow-md);
   }
 
   .cell-container:hover {
-    border-color: rgba(255, 255, 255, 0.12);
+    border-color: var(--border-default);
   }
 
   /* Status specific styles */
   .cell-container.running {
-    border-color: rgba(99, 102, 241, 0.6);
-    box-shadow: 0 0 15px rgba(99, 102, 241, 0.2);
+    border-color: var(--color-primary);
+    box-shadow: 0 0 15px rgba(139, 105, 20, 0.2);
   }
 
   .cell-container.error {
-    border-color: rgba(239, 68, 68, 0.5);
-    box-shadow: 0 0 15px rgba(239, 68, 68, 0.15);
+    border-color: var(--color-error);
+    box-shadow: 0 0 15px rgba(192, 57, 43, 0.15);
   }
 
   .cell-container.stale {
     opacity: 0.6;
-    background: rgba(15, 23, 42, 0.2);
+    background: var(--bg-muted);
     border-style: dashed;
   }
 
@@ -204,8 +220,8 @@
     justify-content: space-between;
     align-items: center;
     padding: 10px 16px;
-    background: rgba(15, 23, 42, 0.3);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    background: var(--bg-header);
+    border-bottom: 1px solid var(--border-subtle);
   }
 
   .left-header {
@@ -218,54 +234,55 @@
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background-color: #64748b;
+    background-color: var(--fg-secondary);
     transition:
       background-color 0.3s ease,
       box-shadow 0.3s ease;
   }
 
   .cell-container.pending .status-indicator {
-    background-color: #475569;
+    background-color: var(--fg-secondary);
   }
 
   .cell-container.running .status-indicator {
-    background-color: #6366f1;
-    box-shadow: 0 0 8px #6366f1;
+    background-color: var(--color-primary);
+    box-shadow: 0 0 8px var(--color-primary);
     animation: pulse 1.5s infinite alternate;
   }
 
   .cell-container.done .status-indicator {
-    background-color: #10b981;
-    box-shadow: 0 0 6px rgba(16, 185, 129, 0.4);
+    background-color: var(--color-success);
+    box-shadow: 0 0 6px rgba(46, 125, 50, 0.4);
   }
 
   .cell-container.error .status-indicator {
-    background-color: #ef4444;
-    box-shadow: 0 0 8px #ef4444;
+    background-color: var(--color-error);
+    box-shadow: 0 0 8px var(--color-error);
   }
 
   .cell-name {
     font-size: 0.85rem;
     font-weight: 600;
-    color: #94a3b8;
+    color: var(--fg-secondary);
+    font-family: var(--font-sans);
   }
 
   .cell-label {
-    background: rgba(99, 102, 241, 0.15);
-    color: #a5b4fc;
-    border: 1px solid rgba(99, 102, 241, 0.2);
+    background: rgba(139, 105, 20, 0.12);
+    color: var(--color-primary);
+    border: 1px solid rgba(139, 105, 20, 0.2);
     padding: 2px 8px;
-    border-radius: 9999px;
+    border-radius: var(--radius-full);
     font-size: 0.75rem;
     font-weight: 500;
   }
 
   .stale-badge {
-    background: rgba(245, 158, 11, 0.15);
-    color: #fcd34d;
-    border: 1px solid rgba(245, 158, 11, 0.2);
+    background: rgba(196, 154, 60, 0.12);
+    color: var(--color-warning);
+    border: 1px solid rgba(196, 154, 60, 0.2);
     padding: 2px 8px;
-    border-radius: 9999px;
+    border-radius: var(--radius-full);
     font-size: 0.75rem;
     font-weight: 500;
   }
@@ -275,7 +292,7 @@
     align-items: center;
     gap: 6px;
     font-size: 0.75rem;
-    color: #64748b;
+    color: var(--fg-secondary);
   }
 
   .stat-item {
@@ -291,7 +308,7 @@
   }
 
   .stat-divider {
-    color: #334155;
+    color: var(--border-default);
   }
 
   /* Outputs Area */
@@ -308,35 +325,31 @@
 
   .placeholder-msg {
     font-size: 0.85rem;
-    color: #475569;
+    color: var(--fg-secondary);
     font-style: italic;
   }
 
   .placeholder-msg.pulsing {
-    color: #818cf8;
+    color: var(--color-primary);
     animation: textPulse 1.5s infinite alternate;
   }
 
-  /* Plain text rendering */
+  /* Plain text rendering — unstyled, flows like markdown */
   .text-output {
     margin: 0;
-    font-family: "JetBrains Mono", ui-monospace, monospace;
-    font-size: 0.875rem;
-    color: #cbd5e1;
-    background: rgba(15, 23, 42, 0.5);
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    border-radius: 8px;
-    padding: 12px;
+    font-family: var(--font-sans);
+    font-size: 0.95rem;
+    line-height: 1.6;
+    color: var(--fg-primary);
     white-space: pre-wrap;
-    word-break: break-all;
-    overflow-x: auto;
+    word-break: break-word;
   }
 
   /* Markdown custom overrides */
   .markdown-output {
     font-size: 0.95rem;
     line-height: 1.6;
-    color: #cbd5e1;
+    color: var(--fg-primary);
   }
 
   .markdown-output :global(p) {
@@ -349,80 +362,83 @@
   }
 
   .markdown-output :global(pre) {
-    background: rgba(15, 23, 42, 0.5);
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    border-radius: 8px;
+    background: var(--bg-sunken);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
     padding: 12px;
     overflow-x: auto;
   }
 
   .markdown-output :global(code) {
-    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-family: var(--font-mono);
     font-size: 0.85em;
-    background: rgba(0, 0, 0, 0.2);
-    padding: 2px 4px;
-    border-radius: 4px;
-    color: #f472b6;
+    background: var(--bg-muted);
+    padding: 1px 3px;
+    border-radius: var(--radius-sm);
+    color: var(--color-accent);
+    line-height: 1;
   }
 
   .markdown-output :global(h1),
   .markdown-output :global(h2),
   .markdown-output :global(h3) {
-    color: #f1f5f9;
+    font-family: var(--font-serif);
+    color: var(--fg-primary);
     margin-top: 16px;
     margin-bottom: 8px;
   }
 
   /* HTML tables and plots */
   .html-output :global(table) {
+    font-family: var(--font-mono);
     border-collapse: collapse;
     width: 100%;
     font-size: 0.85rem;
     margin: 8px 0;
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 8px;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
     overflow: hidden;
   }
 
   .html-output :global(th) {
-    background: rgba(15, 23, 42, 0.6);
-    color: #f1f5f9;
+    background: var(--bg-header);
+    color: var(--fg-primary);
     font-weight: 600;
     text-align: left;
     padding: 8px 12px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid var(--border-default);
   }
 
   .html-output :global(td) {
     padding: 8px 12px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-    color: #cbd5e1;
+    border-bottom: 1px solid var(--border-subtle);
+    color: var(--fg-primary);
   }
 
   .html-output :global(tr:hover) {
-    background: rgba(255, 255, 255, 0.02);
+    background: var(--bg-sunken);
   }
 
   .plotly-output,
   .altair-output {
-    background: rgba(255, 255, 255, 0.01);
-    border: 1px solid rgba(255, 255, 255, 0.04);
-    border-radius: 8px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
     padding: 12px;
     min-height: 100px;
     overflow: hidden;
   }
 
   .object-output {
-    background: rgba(15, 23, 42, 0.3);
-    border: 1px solid rgba(255, 255, 255, 0.04);
-    border-radius: 8px;
+    background: var(--bg-sunken);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
     padding: 12px;
     overflow-x: auto;
   }
 
   .error-msg {
-    color: #f87171;
+    color: var(--color-error);
     font-size: 0.85rem;
     font-weight: 500;
   }

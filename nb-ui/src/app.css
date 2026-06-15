@@ -1,3 +1,14 @@
+/*
+ * app.css — Global base styles and scrollbar theming for nb-notebook.
+ *
+ * Sets body defaults, resets, and custom scrollbar colors.
+ * Relies on tokens defined in theme.css (imported before this file in main.js).
+ *
+ * Dependencies: theme.css (imported first in main.js).
+ * Exports: None (global CSS).
+ * Side-effects: Applies global box-sizing reset and scrollbar styles.
+ * Constraints: None.
+ */
 @import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Outfit:wght@100..900&display=swap");
 
 * {
@@ -9,32 +20,33 @@
 body {
   margin: 0;
   padding: 0;
-  background-color: #0b0f19;
-  color: #f1f5f9;
-  font-family:
-    "Outfit",
-    -apple-system,
-    BlinkMacSystemFont,
-    sans-serif;
+  background-color: var(--bg-base);
+  color: var(--fg-primary);
+  font-family: var(--font-sans);
   min-height: 100vh;
 }
 
-/* Custom Scrollbar for premium feel */
+::selection {
+  background-color: var(--color-selection-bg);
+  color: var(--color-selection-fg);
+}
+
+/* Custom Scrollbar — light warm palette */
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #0f172a;
+  background: var(--bg-sunken);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #1e293b;
-  border-radius: 5px;
-  border: 2px solid #0f172a;
+  background: var(--border-default);
+  border-radius: var(--radius-sm);
+  border: 2px solid var(--bg-sunken);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #334155;
+  background: var(--color-accent);
 }

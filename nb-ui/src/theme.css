@@ -1,0 +1,62 @@
+/*
+ * theme.css — Global design tokens for the nb-notebook light theme.
+ *
+ * Provides CSS custom properties for typography, colors, shadows, spacing,
+ * and radii used across all components. Import once in main.js.
+ *
+ * Dependencies: Outfit and JetBrains Mono loaded via Google Fonts in app.css.
+ * Exports: None (CSS-only).
+ * Side-effects: Defines :root custom properties globally.
+ * Constraints: No runtime theme switching — static light palette.
+ */
+:root {
+  /* Typography */
+  --font-serif: "New York", Georgia, serif;
+  --font-sans: "Outfit", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  /* Backgrounds */
+  --bg-base: #f5f5dc;
+  --bg-elevated: #faf6e7;
+  --bg-sunken: #ebf0e0;
+  --bg-muted: #ede7cf;
+  --bg-header: #e6ebd8;
+
+  /* Foreground / Text */
+  --fg-primary: #1a1a1a;
+  --fg-secondary: #6b5d4a;
+  --fg-on-accent: #faf6e7;
+
+  /* Borders */
+  --border-default: #c9c0a5;
+  --border-subtle: #d4cbb0;
+
+  /* Primary / Accent */
+  --color-primary: #8b6914;
+  --color-secondary: #c49a3c;
+  --color-accent: #a0845c;
+
+  /* Semantic */
+  --color-error: #c0392b;
+  --color-success: #2e7d32;
+  --color-warning: #c49a3c;
+  --color-info: #4a7fb5;
+  --color-link: #4a7fb5;
+  --color-link-visited: #7a5a9e;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px hsla(40, 30%, 50%, 15%);
+  --shadow-md: 0 4px 6px -1px hsla(40, 30%, 50%, 20%);
+  --shadow-lg: 0 10px 15px -3px hsla(40, 30%, 50%, 25%);
+
+  /* Spacing / Radii */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+
+  /* Selection */
+  --color-selection-bg: #a8d0e6;
+  --color-selection-fg: #000000;
+}

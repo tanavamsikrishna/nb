@@ -55,14 +55,14 @@
 <style>
   .db-loading {
     font-size: 0.85rem;
-    color: #64748b;
+    color: var(--fg-secondary);
     font-style: italic;
     padding: 8px 0;
   }
 
   .db-error {
     font-size: 0.85rem;
-    color: #f87171;
+    color: var(--color-error);
     font-weight: 500;
     padding: 8px 0;
   }

@@ -1,3 +1,17 @@
+<!--
+  NotebookHeader.svelte — Renders notebook-level docstring as styled Markdown.
+
+  Converts the docstring (from the notebook's module docstring) to HTML via
+  marked and displays it in a prominent card above the cell list.
+
+  Props:
+    docstring  string  — raw Markdown content (default: "")
+
+  Dependencies: marked (markdown → HTML).
+  Exports: None (render-only component).
+  Side-effects: None.
+  Constraints: Svelte 5 runes ($props, $derived).
+-->
 <script>
   import { marked } from "marked";
 
@@ -14,32 +28,32 @@
 
 <style>
   .notebook-header {
-    background: rgba(30, 41, 59, 0.7);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 16px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-xl);
     padding: 28px;
     margin-bottom: 32px;
-    color: #cbd5e1;
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    color: var(--fg-primary);
+    box-shadow: var(--shadow-lg);
   }
 
   .notebook-header :global(h1) {
+    font-family: var(--font-serif);
     font-size: 2.25rem;
     font-weight: 800;
     margin-top: 0;
     margin-bottom: 18px;
-    background: linear-gradient(135deg, #818cf8 0%, #c084fc 100%);
+    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     letter-spacing: -0.025em;
   }
 
   .notebook-header :global(h2) {
+    font-family: var(--font-serif);
     font-size: 1.5rem;
     font-weight: 600;
-    color: #f1f5f9;
+    color: var(--fg-primary);
     margin-top: 24px;
     margin-bottom: 12px;
   }
@@ -51,12 +65,12 @@
   }
 
   .notebook-header :global(code) {
-    font-family: "JetBrains Mono", ui-monospace, monospace;
-    background: rgba(15, 23, 42, 0.6);
-    padding: 3px 6px;
-    border-radius: 6px;
+    font-family: var(--font-mono);
+    background: var(--bg-sunken);
+    padding: 1px 3px;
+    border-radius: var(--radius-sm);
     font-size: 0.9em;
-    color: #a78bfa;
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    color: var(--color-primary);
+    line-height: 1;
   }
 </style>

@@ -1,3 +1,20 @@
+<!--
+  App.svelte — Root application shell for nb-notebook stream UI.
+
+  Renders the sticky header bar (logo + connection status badge) and the
+  main content area containing the optional NotebookHeader and the list of
+  Cell components. Shows an empty-state placeholder when no cells exist.
+
+  Dependencies:
+    - stores/cells.js       (cells, notebookHeader, connectionStatus stores)
+    - lib/stream.js         (connectStream — SSE connection on mount)
+    - components/NotebookHeader.svelte
+    - components/Cell.svelte
+
+  Exports: None (top-level mount target).
+  Side-effects: Calls connectStream() on mount to open the SSE channel.
+  Constraints: Svelte 5 runes ($props, $state, $derived, $effect).
+-->
 <script>
   import { onMount } from "svelte";
   import { cells, notebookHeader, connectionStatus } from "./stores/cells.js";
@@ -78,36 +95,12 @@
 
 <style>
   :global(body) {
-    background-color: #0b0f19;
-    color: #f1f5f9;
-    font-family:
-      "Outfit",
-      "Inter",
-      -apple-system,
-      BlinkMacSystemFont,
-      "Segoe UI",
-      Roboto,
-      Oxygen,
-      Ubuntu,
-      Cantarell,
-      "Open Sans",
-      "Helvetica Neue",
-      sans-serif;
+    background-color: var(--bg-base);
+    color: var(--fg-primary);
+    font-family: var(--font-sans);
     margin: 0;
     padding: 0;
     min-height: 100vh;
-    background-image:
-      radial-gradient(
-        circle at top right,
-        rgba(99, 102, 241, 0.08),
-        transparent 450px
-      ),
-      radial-gradient(
-        circle at bottom left,
-        rgba(192, 132, 252, 0.05),
-        transparent 400px
-      );
-    background-attachment: fixed;
   }
 
   .app-wrapper {
@@ -117,10 +110,8 @@
   }
 
   .app-header {
-    background: rgba(15, 23, 42, 0.6);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    background: var(--bg-header);
+    border-bottom: 1px solid var(--border-default);
     position: sticky;
     top: 0;
     z-index: 50;
@@ -140,24 +131,25 @@
     align-items: center;
     gap: 8px;
     font-weight: 700;
+    font-family: var(--font-sans);
   }
 
   .logo-nb {
     font-size: 1.5rem;
-    background: linear-gradient(135deg, #818cf8 0%, #a78bfa 100%);
+    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     letter-spacing: -0.05em;
   }
 
   .logo-separator {
-    color: #334155;
+    color: var(--border-default);
     font-weight: 300;
   }
 
   .logo-sub {
     font-size: 0.875rem;
-    color: #64748b;
+    color: var(--fg-secondary);
     font-weight: 500;
     text-transform: uppercase;
     letter-spacing: 0.1em;
@@ -168,9 +160,9 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 9999px;
+    background: var(--bg-muted);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-full);
     padding: 6px 14px;
     font-size: 0.75rem;
     font-weight: 500;
@@ -181,39 +173,39 @@
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background-color: #64748b;
+    background-color: var(--fg-secondary);
   }
 
   .status-badge.connected {
-    background: rgba(16, 185, 129, 0.06);
-    border-color: rgba(16, 185, 129, 0.2);
-    color: #34d399;
+    background: rgba(46, 125, 50, 0.08);
+    border-color: rgba(46, 125, 50, 0.25);
+    color: var(--color-success);
   }
 
   .status-badge.connected .badge-dot {
-    background-color: #10b981;
-    box-shadow: 0 0 8px #10b981;
+    background-color: var(--color-success);
+    box-shadow: 0 0 8px var(--color-success);
   }
 
   .status-badge.connecting {
-    background: rgba(245, 158, 11, 0.06);
-    border-color: rgba(245, 158, 11, 0.2);
-    color: #fbbf24;
+    background: rgba(196, 154, 60, 0.08);
+    border-color: rgba(196, 154, 60, 0.25);
+    color: var(--color-warning);
   }
 
   .status-badge.connecting .badge-dot {
-    background-color: #f59e0b;
+    background-color: var(--color-warning);
     animation: flash 1s infinite alternate;
   }
 
   .status-badge.disconnected {
-    background: rgba(239, 68, 68, 0.06);
-    border-color: rgba(239, 68, 68, 0.2);
-    color: #f87171;
+    background: rgba(192, 57, 43, 0.08);
+    border-color: rgba(192, 57, 43, 0.25);
+    color: var(--color-error);
   }
 
   .status-badge.disconnected .badge-dot {
-    background-color: #ef4444;
+    background-color: var(--color-error);
   }
 
   /* Container */
@@ -238,9 +230,9 @@
     align-items: center;
     justify-content: center;
     text-align: center;
-    background: rgba(30, 41, 59, 0.2);
-    border: 1px dashed rgba(255, 255, 255, 0.08);
-    border-radius: 16px;
+    background: var(--bg-muted);
+    border: 1px dashed var(--border-subtle);
+    border-radius: var(--radius-xl);
     padding: 60px 40px;
     margin-top: 40px;
   }
@@ -248,8 +240,8 @@
   .empty-icon-wrap {
     width: 64px;
     height: 64px;
-    background: rgba(99, 102, 241, 0.1);
-    color: #818cf8;
+    background: var(--bg-sunken);
+    color: var(--color-primary);
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -267,11 +259,12 @@
     font-weight: 600;
     margin-top: 0;
     margin-bottom: 12px;
-    color: #f1f5f9;
+    color: var(--fg-primary);
+    font-family: var(--font-serif);
   }
 
   .empty-state p {
-    color: #94a3b8;
+    color: var(--fg-secondary);
     max-width: 400px;
     font-size: 0.95rem;
     line-height: 1.6;
@@ -280,17 +273,17 @@
   }
 
   .cmd-example {
-    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-family: var(--font-mono);
     font-size: 0.9rem;
-    background: #0f172a;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: var(--bg-sunken);
+    border: 1px solid var(--border-subtle);
     padding: 10px 20px;
-    border-radius: 8px;
-    color: #818cf8;
+    border-radius: var(--radius-md);
+    color: var(--color-primary);
   }
 
   .cmd-example .arg {
-    color: #cbd5e1;
+    color: var(--fg-secondary);
   }
 
   @keyframes flash {

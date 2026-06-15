@@ -1,3 +1,20 @@
+<!--
+  JSONTree.svelte — Recursive JSON object/array tree viewer.
+
+  Renders expandable/collapsible nodes for objects, arrays, and primitive
+  values. Auto-expands the first two depth levels.
+
+  Props:
+    val    any     — value to render
+    label  string  — key name (omitted for array items)
+    depth  number  — nesting depth (controls auto-expand)
+    isLast boolean — whether this is the last sibling (controls trailing comma)
+
+  Dependencies: None (self-referential recursive component).
+  Exports: None (render-only component).
+  Side-effects: None.
+  Constraints: Svelte 5 runes ($props, $state, $derived).
+-->
 <script>
   import JSONTree from "./JSONTree.svelte";
 
@@ -75,10 +92,10 @@
 
 <style>
   .json-node {
-    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-family: var(--font-mono);
     font-size: 0.875rem;
     line-height: 1.6;
-    color: #e2e8f0;
+    color: var(--fg-primary);
     text-align: left;
     display: block;
   }
@@ -94,12 +111,12 @@
     justify-content: center;
     width: 16px;
     height: 16px;
-    color: #64748b;
+    color: var(--fg-secondary);
     vertical-align: middle;
   }
 
   .toggle-btn:hover {
-    color: #cbd5e1;
+    color: var(--fg-primary);
   }
 
   .toggle-icon {
@@ -113,47 +130,47 @@
   }
 
   .key {
-    color: #f43f5e;
+    color: var(--color-error);
   }
 
   .colon {
-    color: #94a3b8;
+    color: var(--fg-secondary);
   }
 
   .brace {
-    color: #cbd5e1;
+    color: var(--fg-primary);
   }
 
   .string {
-    color: #34d399;
+    color: var(--color-success);
     word-break: break-all;
   }
 
   .number {
-    color: #fbbf24;
+    color: var(--color-warning);
   }
 
   .boolean {
-    color: #60a5fa;
+    color: var(--color-info);
   }
 
   .null {
-    color: #94a3b8;
+    color: var(--fg-secondary);
     font-weight: 600;
   }
 
   .other {
-    color: #c084fc;
+    color: var(--color-link-visited);
   }
 
   .collapsed-preview {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: var(--bg-muted);
+    border: 1px solid var(--border-subtle);
     padding: 0px 6px;
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     cursor: pointer;
     font-size: 0.75rem;
-    color: #94a3b8;
+    color: var(--fg-secondary);
     font-family: inherit;
     line-height: 1.2;
     vertical-align: middle;
@@ -161,12 +178,12 @@
   }
 
   .collapsed-preview:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: #cbd5e1;
+    background: var(--bg-sunken);
+    color: var(--fg-primary);
   }
 
   .nested {
-    border-left: 1px dashed rgba(255, 255, 255, 0.08);
+    border-left: 1px dashed var(--border-subtle);
     padding-left: 14px;
     margin-left: 6px;
   }
