@@ -40,7 +40,7 @@ def test_table_auto_dispatch():
 
 
 def test_plain_dataframe_still_html():
-    """Plain Polars DataFrame (not wrapped) should still render as HTML."""
+    """Plain Polars DataFrame (not wrapped) should still render as table."""
     df = pl.DataFrame({"x": [10, 20]})
     record = _create_display_record(df)
-    assert record.type == "html"
+    assert record.type == "table"
