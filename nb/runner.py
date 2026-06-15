@@ -116,37 +116,6 @@ def parse_notebook(source: str) -> Tuple[str | None, List[Cell]]:
     return docstring, cells
 
 
-def wrap_statement_with_timing(stmt: ast.stmt, idx: int) -> List[ast.stmt]:
-    tw_var = f"_tw_{idx}"
-    tc_var = f"_tc_{idx}"
-
-    code_template = f"""
-{tw_var} = _time.perf_counter()
-{tc_var} = _time.process_time()
-try:
-    pass
-finally:
-    _cell_wall_accum += _time.perf_counter() - {tw_var}
-    _cell_cpu_accum += _time.process_time() - {tc_var}
-"""
-    parsed = ast.parse(code_template)
-    try_node = parsed.body[2]
-    # Replace pass with the actual statement
-    try_node.body = [stmt]
-    return parsed.body
-
-
-def transform_cell_ast(cell_code: str, filename: str) -> ast.Module:
-    tree = ast.parse(cell_code, filename=filename)
-    new_body = []
-    for idx, stmt in enumerate(tree.body):
-        wrapped = wrap_statement_with_timing(stmt, idx)
-        new_body.extend(wrapped)
-    tree.body = new_body
-    ast.fix_missing_locations(tree)
-    return tree
-
-
 def run_notebook(path: Path, exec_ns: dict, emit_event: Callable[[str, dict], None]) -> None:
     try:
         with open(path, "r", encoding="utf-8") as f:
@@ -176,7 +145,6 @@ def run_notebook(path: Path, exec_ns: dict, emit_event: Callable[[str, dict], No
     exec_ns.setdefault("MD", fw.MD)
     exec_ns.setdefault("HTML", fw.HTML)
     exec_ns.setdefault("Object", fw.Object)
-    exec_ns["_time"] = time
 
     old_emitter = fw._active_emitter
     installed_runner_emitter = old_emitter is None
@@ -201,21 +169,17 @@ def run_notebook(path: Path, exec_ns: dict, emit_event: Callable[[str, dict], No
             # Set active cell ID in framework so that display primitives can tag themselves
             fw._current_cell_id = cell.id
 
-            # Initialize statement accumulator variables
-            exec_ns["_cell_wall_accum"] = 0.0
-            exec_ns["_cell_cpu_accum"] = 0.0
-
             try:
-                # Transform cell code to inject statement timing
-                cell_ast = transform_cell_ast(cell.code, str(path))
-                compiled = compile(cell_ast, str(path), "exec")
+                compiled = compile(cell.code, str(path), "exec")
 
-                # Execute the cell
-                exec(compiled, exec_ns)
-
-                # Read accumulated times and convert to milliseconds
-                wall_ms = int(exec_ns.get("_cell_wall_accum", 0.0) * 1000)
-                cpu_ms = int(exec_ns.get("_cell_cpu_accum", 0.0) * 1000)
+                # Wrap the whole cell in timing
+                wall_start = time.perf_counter()
+                cpu_start = time.process_time()
+                try:
+                    exec(compiled, exec_ns)
+                finally:
+                    wall_ms = int((time.perf_counter() - wall_start) * 1000)
+                    cpu_ms = int((time.process_time() - cpu_start) * 1000)
 
                 emit_event(
                     "cell_end",
@@ -225,9 +189,6 @@ def run_notebook(path: Path, exec_ns: dict, emit_event: Callable[[str, dict], No
                 # Format and emit traceback as plain text
                 tb = traceback.format_exc()
                 emit_event("display_record", {"cell_id": cell.id, "type": "text", "payload": tb})
-
-                wall_ms = int(exec_ns.get("_cell_wall_accum", 0.0) * 1000)
-                cpu_ms = int(exec_ns.get("_cell_cpu_accum", 0.0) * 1000)
 
                 emit_event(
                     "cell_end",
