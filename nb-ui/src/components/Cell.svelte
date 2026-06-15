@@ -337,7 +337,7 @@
   /* Plain text rendering — unstyled, flows like markdown */
   .text-output {
     margin: 0;
-    font-family: var(--font-sans);
+    font-family: var(--font-serif);
     font-size: 0.95rem;
     line-height: 1.6;
     color: var(--fg-primary);
@@ -382,7 +382,7 @@
   .markdown-output :global(h1),
   .markdown-output :global(h2),
   .markdown-output :global(h3) {
-    font-family: var(--font-serif);
+    font-family: var(--font-sans);
     color: var(--fg-primary);
     margin-top: 16px;
     margin-bottom: 8px;

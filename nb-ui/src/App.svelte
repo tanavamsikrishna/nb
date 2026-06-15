@@ -107,7 +107,7 @@
   :global(body) {
     background-color: var(--bg-base);
     color: var(--fg-primary);
-    font-family: var(--font-sans);
+    font-family: var(--font-serif);
     margin: 0;
     padding: 0;
     min-height: 100vh;
@@ -291,7 +291,7 @@
     margin-top: 0;
     margin-bottom: 12px;
     color: var(--fg-primary);
-    font-family: var(--font-serif);
+    font-family: var(--font-sans);
   }
 
   .empty-state p {

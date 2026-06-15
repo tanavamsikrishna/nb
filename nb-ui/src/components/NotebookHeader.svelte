@@ -38,7 +38,7 @@
   }
 
   .notebook-header :global(h1) {
-    font-family: var(--font-serif);
+    font-family: var(--font-sans);
     font-size: 2.25rem;
     font-weight: 800;
     margin-top: 0;
@@ -54,7 +54,7 @@
   }
 
   .notebook-header :global(h2) {
-    font-family: var(--font-serif);
+    font-family: var(--font-sans);
     font-size: 1.5rem;
     font-weight: 600;
     color: var(--fg-primary);
