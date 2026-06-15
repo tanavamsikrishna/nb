@@ -4,11 +4,13 @@
  * Provides CSS custom properties for typography, colors, shadows, spacing,
  * and radii used across all components. Import once in main.js.
  *
- * Dependencies: Outfit and JetBrains Mono loaded via Google Fonts in app.css.
+ * Dependencies: Google Fonts (Outfit, JetBrains Mono) loaded via @import below.
  * Exports: None (CSS-only).
- * Side-effects: Defines :root custom properties globally.
+ * Side-effects: Defines :root custom properties globally; loads web fonts.
  * Constraints: No runtime theme switching — static light palette.
  */
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Outfit:wght@100..900&display=swap");
+
 :root {
   /* Typography */
   --font-serif: "New York", Georgia, serif;
@@ -18,14 +20,14 @@
   /* Backgrounds */
   --bg-base: #f5f5dc;
   --bg-elevated: #faf6e7;
-  --bg-sunken: #ebf0e0;
+  --bg-sunken: #e8e2cc;
   --bg-muted: #ede7cf;
-  --bg-header: #e6ebd8;
+  --bg-header: #e2dcc8;
 
   /* Foreground / Text */
   --fg-primary: #1a1a1a;
   --fg-secondary: #6b5d4a;
-  --fg-on-accent: #faf6e7;
+  --fg-on-accent: #1a1a1a;
 
   /* Borders */
   --border-default: #c9c0a5;
@@ -39,7 +41,7 @@
   /* Semantic */
   --color-error: #c0392b;
   --color-success: #2e7d32;
-  --color-warning: #c49a3c;
+  --color-warning: #c47a20;
   --color-info: #4a7fb5;
   --color-link: #4a7fb5;
   --color-link-visited: #7a5a9e;
@@ -56,7 +58,32 @@
   --radius-xl: 16px;
   --radius-full: 9999px;
 
+  /* Semantic aliases */
+  --color-brand: var(--color-secondary);
+  --color-interactive: var(--color-primary);
+  --color-surface-tint: var(--color-accent);
+
+  /* Interactive states */
+  --color-interactive-hover: #6e530f;
+  --color-interactive-active: #52400b;
+  --color-focus-ring: var(--color-primary);
+  --color-focus-ring-offset: #f5f5dc;
+
+  /* Code surfaces */
+  --fg-code: #5a3e1b;
+  --bg-code-inline: #ede7cf;
+  --bg-code-block: #e8e2cc;
+
+  /* Spacing scale */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+
   /* Selection */
-  --color-selection-bg: #a8d0e6;
+  --color-selection-bg: #e6c97a;
   --color-selection-fg: #000000;
 }
