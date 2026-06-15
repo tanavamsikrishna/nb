@@ -121,7 +121,11 @@ def _create_display_record(obj: Any) -> DisplayRecord:
     if isinstance(obj, HTML):
         return DisplayRecord(type="html", payload=obj.text)
 
-    # 7. Object Wrapper
+    # 7. String Wrapper
+    if isinstance(obj, str):
+        return DisplayRecord(type="text", payload=obj)
+
+    # 8. Object Wrapper
     if isinstance(obj, Object):
         return DisplayRecord(type="object", payload=_serialize_object(obj.obj))
 
