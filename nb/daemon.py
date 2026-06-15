@@ -162,6 +162,8 @@ async def main(project_dir: Path, *, host: str = "0.0.0.0", port: int = 7777) ->
     def _signal_handler() -> None:
         nonlocal shutting_down
         if shutting_down:
+            if socket_path.exists():
+                socket_path.unlink()
             os._exit(1)
         shutting_down = True
         shutdown_event.set()
