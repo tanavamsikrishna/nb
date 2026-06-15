@@ -85,8 +85,8 @@
   <div class="cell-header">
     <div class="left-header">
       <span class="status-indicator"></span>
-      {#if cell.label}
-        <span class="cell-label">{cell.label}</span>
+      {#if cell.cell_header}
+        <span class="cell-header">{cell.cell_header}</span>
       {/if}
       {#if cell.stale}
         <span class="stale-badge">Stale</span>
@@ -268,7 +268,7 @@
     font-family: var(--font-sans);
   }
 
-  .cell-label {
+  .cell-header {
     background: rgba(139, 105, 20, 0.12);
     color: var(--color-primary);
     border: 1px solid rgba(139, 105, 20, 0.2);

@@ -37,7 +37,7 @@ export function connectStream() {
   });
 
   eventSource.addEventListener("cell_start", (e) => {
-    const { cell_id, label } = JSON.parse(e.data);
+    const { cell_id, cell_header } = JSON.parse(e.data);
     cells.update((cs) => {
       const cell = cs.find((c) => c.id === cell_id);
       if (cell) {
@@ -45,7 +45,7 @@ export function connectStream() {
         cell.stale = false;
         cell.records = [];
         cell.profiling = null;
-        cell.label = label;
+        cell.cell_header = cell_header;
       }
       return cs;
     });
@@ -102,7 +102,7 @@ function reconcile(manifest) {
           stale: false,
           records: [],
           profiling: null,
-          label: item.label || null,
+          cell_header: item.cell_header || null,
         });
       }
     }

@@ -11,7 +11,7 @@ import nb.framework as fw
 @dataclass
 class Cell:
     id: int
-    label: str
+    cell_header: str
     source_line: int
     code: str
 
@@ -63,7 +63,7 @@ def parse_notebook(source: str) -> Tuple[str | None, List[Cell]]:
                 cells.append(
                     Cell(
                         id=cell_id,
-                        label=current_label,
+                        cell_header=current_label,
                         source_line=current_source_line,
                         code=code,
                     )
@@ -84,7 +84,7 @@ def parse_notebook(source: str) -> Tuple[str | None, List[Cell]]:
         cells.append(
             Cell(
                 id=cell_id,
-                label=current_label,
+                cell_header=current_label,
                 source_line=current_source_line,
                 code=code,
             )
@@ -96,7 +96,7 @@ def parse_notebook(source: str) -> Tuple[str | None, List[Cell]]:
         cells.append(
             Cell(
                 id=0,
-                label="",
+                cell_header="",
                 source_line=1,
                 code="",
             )
@@ -126,7 +126,7 @@ def run_notebook(path: Path, exec_ns: dict, emit_event: Callable[[str, dict], No
     emit_event("notebook_header", header_data)
 
     # Build and emit cell manifest
-    cell_manifest = [{"id": cell.id, "label": cell.label} for cell in cells]
+    cell_manifest = [{"id": cell.id, "cell_header": cell.cell_header} for cell in cells]
     emit_event("run_start", {"cell_manifest": cell_manifest})
 
     # Prepare execution namespace
@@ -156,7 +156,7 @@ def run_notebook(path: Path, exec_ns: dict, emit_event: Callable[[str, dict], No
         for cell in cells:
             emit_event(
                 "cell_start",
-                {"cell_id": cell.id, "source_line": cell.source_line, "label": cell.label},
+                {"cell_id": cell.id, "source_line": cell.source_line, "cell_header": cell.cell_header},
             )
 
             # Set active cell ID in framework so that display primitives can tag themselves
