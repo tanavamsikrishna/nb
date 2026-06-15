@@ -30,7 +30,9 @@ from nb import HTML, MD, Object, Table, display, nb_cache
 display(MD("# Welcome to the `nb` runner!"))
 display(HTML("<p style='color: #2563eb;'>This HTML text is styled directly.</p>"))
 
-time.sleep(2)
+for _ in range(5):
+    time.sleep(1)
+    display("show something")
 
 display(MD("## Sample numpy"))
 # Generate mock sample data
@@ -88,5 +90,5 @@ df = pl.DataFrame({"x": ["A", "B", "C"], "y": [10, 20, 15]})
 fig = px.bar(df, x="x", y="y", title="Sample Bar Chart")
 display(fig)
 
-# %% Cell 6
+# %% Display a table
 display(Table(pl.concat([df] * 10)))
