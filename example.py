@@ -31,6 +31,8 @@ from nb import HTML, MD, Object, Table, display, nb_cache
 display(MD("# Welcome to the `nb` runner!"))
 display(HTML("<p style='color: #2563eb;'>This HTML text is styled directly.</p>"))
 
+time.sleep(2)
+
 display(MD("## Sample numpy"))
 # Generate mock sample data
 df = pl.DataFrame(
