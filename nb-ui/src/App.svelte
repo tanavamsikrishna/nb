@@ -17,7 +17,7 @@
 -->
 <script>
   import { onMount } from "svelte";
-  import { cells, notebookHeader, connectionStatus } from "./stores/cells.js";
+  import { cells, notebookHeader, notebookPath, connectionStatus } from "./stores/cells.js";
   import { connectStream } from "./lib/stream.js";
   import NotebookHeader from "./components/NotebookHeader.svelte";
   import Cell from "./components/Cell.svelte";
@@ -35,6 +35,9 @@
         <span class="logo-nb">nb</span>
         <span class="logo-separator">/</span>
         <span class="logo-sub">notebook stream</span>
+        {#if $notebookPath}
+          <span class="notebook-path" title={$notebookPath}>{$notebookPath}</span>
+        {/if}
       </div>
 
       <div class="status-badge {$connectionStatus}">
@@ -136,7 +139,11 @@
 
   .logo-nb {
     font-size: 1.5rem;
-    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 100%);
+    background: linear-gradient(
+      135deg,
+      var(--color-primary) 0%,
+      var(--color-secondary) 100%
+    );
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     letter-spacing: -0.05em;
@@ -153,6 +160,23 @@
     font-weight: 500;
     text-transform: uppercase;
     letter-spacing: 0.1em;
+  }
+
+  .notebook-path {
+    font-size: 0.75rem;
+    color: var(--fg-tertiary);
+    font-family: var(--font-mono);
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: normal;
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-left: 8px;
+    padding: 2px 8px;
+    background: var(--bg-sunken);
+    border-radius: var(--radius-sm);
   }
 
   /* Connection badge */

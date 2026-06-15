@@ -4,7 +4,8 @@ import time
 import traceback
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Any, Tuple, List
+from typing import Callable, List, Tuple
+
 import nb.framework as fw
 
 
@@ -156,9 +157,11 @@ def run_notebook(path: Path, exec_ns: dict, emit_event: Callable[[str, dict], No
 
     docstring, cells = parse_notebook(source)
 
-    # Emit notebook header
+    # Emit notebook header (always emit so frontend receives the path)
+    header_data: dict = {"path": str(path)}
     if docstring is not None:
-        emit_event("notebook_header", {"docstring": docstring})
+        header_data["docstring"] = docstring
+    emit_event("notebook_header", header_data)
 
     # Build and emit cell manifest
     cell_manifest = [{"id": cell.id, "content_hash": cell.content_hash} for cell in cells]

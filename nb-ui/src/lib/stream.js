@@ -1,5 +1,5 @@
+import { cells, connectionStatus, notebookHeader, notebookPath } from "../stores/cells.js";
 import { getDb } from "./duckdb.js";
-import { cells, notebookHeader, connectionStatus } from "../stores/cells.js";
 
 // Pre-warm DuckDB-WASM in background (~8MB lazy load, cached after first load)
 getDb();
@@ -20,7 +20,10 @@ export function connectStream() {
 
   eventSource.addEventListener("notebook_header", (e) => {
     const data = JSON.parse(e.data);
-    notebookHeader.set(data.docstring);
+    notebookPath.set(data.path);
+    if (data.docstring) {
+      notebookHeader.set(data.docstring);
+    }
   });
 
   eventSource.addEventListener("run_start", (e) => {
