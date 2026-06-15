@@ -1,5 +1,5 @@
 """
-# nb Framework Example Notebook
+# NB Framework Example Notebook
 
 This notebook demonstrates the capabilities of the `nb` execution and display framework, including:
 
