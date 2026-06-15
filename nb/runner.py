@@ -1,5 +1,4 @@
 import ast
-import hashlib
 import time
 import traceback
 from dataclasses import dataclass
@@ -15,7 +14,6 @@ class Cell:
     label: str
     source_line: int
     code: str
-    content_hash: str
 
 
 def _is_empty_or_only_docstring(code: str) -> bool:
@@ -62,14 +60,12 @@ def parse_notebook(source: str) -> Tuple[str | None, List[Cell]]:
                 # Skip cell 0 if it contains only the docstring/comments
                 pass
             else:
-                content_hash = hashlib.blake2b(code.encode("utf-8")).hexdigest()
                 cells.append(
                     Cell(
                         id=cell_id,
                         label=current_label,
                         source_line=current_source_line,
                         code=code,
-                        content_hash=content_hash,
                     )
                 )
                 cell_id += 1
@@ -85,14 +81,12 @@ def parse_notebook(source: str) -> Tuple[str | None, List[Cell]]:
     if cell_id == 0 and _is_empty_or_only_docstring(code):
         pass
     else:
-        content_hash = hashlib.blake2b(code.encode("utf-8")).hexdigest()
         cells.append(
             Cell(
                 id=cell_id,
                 label=current_label,
                 source_line=current_source_line,
                 code=code,
-                content_hash=content_hash,
             )
         )
         cell_id += 1
@@ -105,7 +99,6 @@ def parse_notebook(source: str) -> Tuple[str | None, List[Cell]]:
                 label="",
                 source_line=1,
                 code="",
-                content_hash=hashlib.blake2b(b"").hexdigest(),
             )
         )
 
@@ -133,7 +126,7 @@ def run_notebook(path: Path, exec_ns: dict, emit_event: Callable[[str, dict], No
     emit_event("notebook_header", header_data)
 
     # Build and emit cell manifest
-    cell_manifest = [{"id": cell.id, "content_hash": cell.content_hash} for cell in cells]
+    cell_manifest = [{"id": cell.id} for cell in cells]
     emit_event("run_start", {"cell_manifest": cell_manifest})
 
     # Prepare execution namespace

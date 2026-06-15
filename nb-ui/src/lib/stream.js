@@ -91,24 +91,12 @@ function reconcile(manifest) {
     for (const item of manifest) {
       const existing = currentCells.find((c) => c.id === item.id);
       if (existing) {
-        if (existing.content_hash === item.content_hash) {
-          existing.stale = false;
-          existing.status = "pending";
-          updatedCells.push(existing);
-        } else {
-          updatedCells.push({
-            id: item.id,
-            content_hash: item.content_hash,
-            status: "pending",
-            stale: true,
-            records: [],
-            profiling: null,
-          });
-        }
+        existing.stale = true;
+        existing.status = "pending";
+        updatedCells.push(existing);
       } else {
         updatedCells.push({
           id: item.id,
-          content_hash: item.content_hash,
           status: "pending",
           stale: false,
           records: [],
