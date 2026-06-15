@@ -1,5 +1,7 @@
 import asyncio
 import json
+import os
+import signal
 from pathlib import Path
 from typing import Set
 
@@ -151,11 +153,24 @@ async def main(project_dir: Path, *, host: str = "0.0.0.0", port: int = 7777) ->
         f"Daemon started. Unix socket at {socket_path}, HTTP at http://localhost:{port}", flush=True
     )
 
+    # Graceful shutdown event — triggered by SIGINT/SIGTERM
+    # First signal: graceful shutdown. Second signal: force exit.
+    shutdown_event = asyncio.Event()
+    loop = asyncio.get_running_loop()
+    shutting_down = False
+
+    def _signal_handler() -> None:
+        nonlocal shutting_down
+        if shutting_down:
+            os._exit(1)
+        shutting_down = True
+        shutdown_event.set()
+
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        loop.add_signal_handler(sig, _signal_handler)
+
     try:
-        while True:
-            await asyncio.sleep(3600)
-    except asyncio.CancelledError:
-        pass
+        await shutdown_event.wait()
     finally:
         socket_server.close()
         await socket_server.wait_closed()
@@ -165,7 +180,4 @@ async def main(project_dir: Path, *, host: str = "0.0.0.0", port: int = 7777) ->
 
 
 def start_daemon(project_dir: Path) -> None:
-    try:
-        asyncio.run(main(project_dir))
-    except KeyboardInterrupt:
-        pass
+    asyncio.run(main(project_dir))
