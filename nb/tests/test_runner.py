@@ -1,7 +1,7 @@
-import pytest
 from pathlib import Path
 from typing import List, Tuple
-from nb.runner import parse_notebook, run_notebook, Cell
+
+from nb.runner import parse_notebook, run_notebook
 
 
 def test_parse_notebook() -> None:
@@ -19,11 +19,11 @@ b = 2
     assert docstring == "This is a test notebook."
     assert len(cells) == 2
 
-    assert cells[0].cell_header == "cell1"
+    assert cells[0].title == "cell1"
     assert cells[0].source_line == 5
     assert "print" in cells[0].code
 
-    assert cells[1].cell_header == "cell2"
+    assert cells[1].title == "cell2"
     assert cells[1].source_line == 8
 
 

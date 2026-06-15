@@ -17,7 +17,7 @@ def func():
 4. Auto-detected displays for Polars and Plotly
 """
 
-# %% imports
+# %% Imports
 import time
 from datetime import date
 
@@ -26,7 +26,7 @@ import polars as pl
 
 from nb import HTML, MD, Object, Table, display, nb_cache
 
-# %% Cell 1: Introduction
+# %% Introduction
 display(MD("# Welcome to the `nb` runner!"))
 display(HTML("<p style='color: #2563eb;'>This HTML text is styled directly.</p>"))
 
@@ -51,7 +51,7 @@ df = pl.DataFrame(
 )
 display(Table(pl.concat([df] * 10)))
 
-# %% Cell 2: Collapsible Object Wrapper
+# %% Collapsible Object Wrapper
 my_data = {
     "project": "nb",
     "version": "0.1.0",
@@ -61,7 +61,7 @@ my_data = {
 display(Object(my_data))
 display(MD("**Hello**"))
 
-# %% Cell 3: Caching with @nb_cache
+# %% Caching with @nb_cache
 
 WINDOW = 3
 
@@ -76,13 +76,13 @@ def expensive_computation(x):
 res1 = expensive_computation(3)
 display(f"Result 1: {res1}")
 
-# %% Cell 4: Verify Caching Hit
+# %% Verify Caching Hit
 # This call should hit the cache, replay the md display record instantly, and return 30 without sleeping
 res2 = expensive_computation(10)
 display(f"Result 2: {res2}")
 
 
-# %% Cell 5: Plotly Display
+# %% Plotly Display
 
 df = pl.DataFrame({"x": ["A", "B", "C"], "y": [10, 20, 15]})
 fig = px.bar(df, x="x", y="y", title="Sample Bar Chart")
