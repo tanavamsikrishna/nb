@@ -17,8 +17,7 @@ def func():
 4. Auto-detected displays for Polars and Plotly
 """
 
-# %%
-
+# %% imports
 import time
 from datetime import date
 

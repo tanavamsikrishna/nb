@@ -85,7 +85,6 @@
   <div class="cell-header">
     <div class="left-header">
       <span class="status-indicator"></span>
-      <span class="cell-name">Cell #{cell.id}</span>
       {#if cell.label}
         <span class="cell-label">{cell.label}</span>
       {/if}
@@ -135,43 +134,45 @@
   </div>
 
   <!-- Cell Outputs -->
-  <div class="cell-outputs">
-    {#each cell.records as record, i}
-      <div class="output-item">
-        {#if record.type === "md"}
-          <div class="markdown-output">
-            {@html marked.parse(record.payload)}
-          </div>
-        {:else if record.type === "table"}
-          <DataTable
-            payload={record.payload}
-            cellId={cell.id}
-            recordIndex={i}
-          />
-        {:else if record.type === "html"}
-          <div class="html-output">
-            {@html record.payload}
-          </div>
-        {:else if record.type === "plotly"}
-          <div class="plotly-output" use:plotlyAction={record.payload}></div>
-        {:else if record.type === "altair"}
-          <div class="altair-output" use:altairAction={record.payload}></div>
-        {:else if record.type === "object"}
-          <div class="object-output">
-            <JSONTree val={record.payload} />
-          </div>
-        {:else if record.type === "text"}
-          <pre class="text-output">{record.payload}</pre>
+  {#if cell.records.length != 0}
+    <div class="cell-outputs">
+      {#each cell.records as record, i}
+        <div class="output-item">
+          {#if record.type === "md"}
+            <div class="markdown-output">
+              {@html marked.parse(record.payload)}
+            </div>
+          {:else if record.type === "table"}
+            <DataTable
+              payload={record.payload}
+              cellId={cell.id}
+              recordIndex={i}
+            />
+          {:else if record.type === "html"}
+            <div class="html-output">
+              {@html record.payload}
+            </div>
+          {:else if record.type === "plotly"}
+            <div class="plotly-output" use:plotlyAction={record.payload}></div>
+          {:else if record.type === "altair"}
+            <div class="altair-output" use:altairAction={record.payload}></div>
+          {:else if record.type === "object"}
+            <div class="object-output">
+              <JSONTree val={record.payload} />
+            </div>
+          {:else if record.type === "text"}
+            <pre class="text-output">{record.payload}</pre>
+          {/if}
+        </div>
+      {:else}
+        {#if cell.status === "pending"}
+          <div class="placeholder-msg">Waiting for execution...</div>
+        {:else if cell.status === "running" && cell.records.length === 0}
+          <div class="placeholder-msg pulsing">Running cell...</div>
         {/if}
-      </div>
-    {:else}
-      {#if cell.status === "pending"}
-        <div class="placeholder-msg">Waiting for execution...</div>
-      {:else if cell.status === "running" && cell.records.length === 0}
-        <div class="placeholder-msg pulsing">Running cell...</div>
-      {/if}
-    {/each}
-  </div>
+      {/each}
+    </div>
+  {/if}
 </div>
 
 <style>

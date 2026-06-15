@@ -126,7 +126,7 @@ def run_notebook(path: Path, exec_ns: dict, emit_event: Callable[[str, dict], No
     emit_event("notebook_header", header_data)
 
     # Build and emit cell manifest
-    cell_manifest = [{"id": cell.id} for cell in cells]
+    cell_manifest = [{"id": cell.id, "label": cell.label} for cell in cells]
     emit_event("run_start", {"cell_manifest": cell_manifest})
 
     # Prepare execution namespace
