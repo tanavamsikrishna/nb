@@ -1,4 +1,9 @@
-import { cells, connectionStatus, notebookHeader, notebookPath } from "../stores/cells.js";
+import {
+  cells,
+  connectionStatus,
+  notebookHeader,
+  notebookPath,
+} from "../stores/cells.js";
 import { getDb } from "./duckdb.js";
 
 // Pre-warm DuckDB-WASM in background (~8MB lazy load, cached after first load)

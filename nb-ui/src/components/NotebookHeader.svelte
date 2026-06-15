@@ -43,7 +43,11 @@
     font-weight: 800;
     margin-top: 0;
     margin-bottom: 18px;
-    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 100%);
+    background: linear-gradient(
+      135deg,
+      var(--color-primary) 0%,
+      var(--color-secondary) 100%
+    );
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     letter-spacing: -0.025em;
@@ -71,6 +75,6 @@
     border-radius: var(--radius-sm);
     font-size: 0.9em;
     color: var(--color-primary);
-    line-height: 1;
+    line-height: 1.5;
   }
 </style>

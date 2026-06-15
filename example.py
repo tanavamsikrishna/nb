@@ -2,6 +2,15 @@
 # nb Framework Example Notebook
 
 This notebook demonstrates the capabilities of the `nb` execution and display framework, including:
+
+```json
+{"key":"value"}
+```
+
+```py
+def func():
+    print("Hello")
+```
 1. Markdown rendering
 2. Collapsible JSON tree viewer
 3. `@nb_cache` caching decorator

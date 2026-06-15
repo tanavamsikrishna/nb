@@ -17,7 +17,12 @@
 -->
 <script>
   import { onMount } from "svelte";
-  import { cells, notebookHeader, notebookPath, connectionStatus } from "./stores/cells.js";
+  import {
+    cells,
+    notebookHeader,
+    notebookPath,
+    connectionStatus,
+  } from "./stores/cells.js";
   import { connectStream } from "./lib/stream.js";
   import NotebookHeader from "./components/NotebookHeader.svelte";
   import Cell from "./components/Cell.svelte";
@@ -36,7 +41,9 @@
         <span class="logo-separator">/</span>
         <span class="logo-sub">notebook stream</span>
         {#if $notebookPath}
-          <span class="notebook-path" title={$notebookPath}>{$notebookPath}</span>
+          <span class="notebook-path" title={$notebookPath}
+            >{$notebookPath}</span
+          >
         {/if}
       </div>
 
