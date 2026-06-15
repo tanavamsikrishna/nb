@@ -14,7 +14,7 @@
   Side-effects: Executes SQL queries against DuckDB on user interaction.
   Constraints: conn must be an active AsyncDuckDB connection.
 -->
-<script>
+<script lang="ts">
   const MAX_DISPLAY_ROWS = 25;
 
   const { conn, viewName, totalRows } = $props();

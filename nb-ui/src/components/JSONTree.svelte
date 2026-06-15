@@ -15,7 +15,7 @@
   Side-effects: None.
   Constraints: Svelte 5 runes ($props, $state, $derived).
 -->
-<script>
+<script lang="ts">
   import JSONTree from "./JSONTree.svelte";
 
   let { val, label = "", depth = 0, isLast = true } = $props();

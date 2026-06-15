@@ -12,7 +12,7 @@
   Side-effects: None.
   Constraints: Svelte 5 runes ($props, $derived).
 -->
-<script>
+<script lang="ts">
   import { marked } from "marked";
 
   // Svelte 5 props

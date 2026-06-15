@@ -3,8 +3,8 @@ import {
   connectionStatus,
   notebookHeader,
   notebookPath,
-} from "../stores/cells.js";
-import { getDb } from "./duckdb.js";
+} from "../stores/cells";
+import { getDb } from "./duckdb";
 
 // Pre-warm DuckDB-WASM in background (~8MB lazy load, cached after first load)
 getDb();

@@ -18,11 +18,11 @@
   Side-effects: Lazy-loads Plotly/Vega on first use via Svelte actions.
   Constraints: Svelte 5 runes ($props, $state, $derived).
 -->
-<script>
+<script lang="ts">
   import { marked } from "marked";
   import JSONTree from "./JSONTree.svelte";
   import DataTable from "./DataTable.svelte";
-  import { loadPlotly, loadVega } from "../lib/lazy_load.js";
+  import { loadPlotly, loadVega } from "../lib/lazy_load";
 
   // Svelte 5 props
   let { cell } = $props();

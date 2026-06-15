@@ -14,9 +14,9 @@
   Side-effects: Registers a file buffer and creates a view in DuckDB-WASM.
   Constraints: Must be used inside Cell.svelte where cellId and recordIndex are available.
 -->
-<script>
+<script lang="ts">
   import { onDestroy } from "svelte";
-  import { getDb } from "$lib/duckdb.js";
+  import { getDb } from "$lib/duckdb";
   import DataTableView from "./DataTableView.svelte";
 
   let { payload, cellId, recordIndex } = $props();

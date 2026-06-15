@@ -15,15 +15,15 @@
   Side-effects: Calls connectStream() on mount to open the SSE channel.
   Constraints: Svelte 5 runes ($props, $state, $derived, $effect).
 -->
-<script>
+<script lang="ts">
   import { onMount } from "svelte";
   import {
     cells,
     notebookHeader,
     notebookPath,
     connectionStatus,
-  } from "./stores/cells.js";
-  import { connectStream } from "./lib/stream.js";
+  } from "./stores/cells";
+  import { connectStream } from "./lib/stream";
   import NotebookHeader from "./components/NotebookHeader.svelte";
   import Cell from "./components/Cell.svelte";
 
