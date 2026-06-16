@@ -11,10 +11,19 @@ This notebook demonstrates the capabilities of the `nb` execution and display fr
 def func():
     print("Hello")
 ```
+
+## Ordered list
 1. Markdown rendering
+    1. One
+    2. Two
 2. Collapsible JSON tree viewer
 3. `@nb_cache` caching decorator
 4. Auto-detected displays for Polars and Plotly
+
+## Unordered list
+- An unordered list item
+- An unordered list item 2
+
 """
 
 # %% Imports
@@ -30,7 +39,7 @@ from nb import HTML, MD, Object, Table, display, nb_cache
 display(MD("# Welcome to the `nb` runner!"))
 display(HTML("<p style='color: #2563eb;'>This HTML text is styled directly.</p>"))
 
-for _ in range(5):
+for _ in range(2):
     time.sleep(1)
     display("show something")
 

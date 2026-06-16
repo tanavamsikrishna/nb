@@ -9,7 +9,7 @@
     cell  Object  — cell data from the cells store (id, status, records, profiling, etc.)
 
   Dependencies:
-    - marked            (markdown → HTML)
+    - Markdown.svelte   (markdown rendering & typography)
     - JSONTree.svelte   (recursive object renderer)
     - DataTable.svelte  (DuckDB-backed table viewer)
     - lib/lazy_load.js  (loadPlotly, loadVega — deferred heavy libs)
@@ -19,7 +19,7 @@
   Constraints: Svelte 5 runes ($props, $state, $derived).
 -->
 <script lang="ts">
-  import { marked } from "marked";
+  import Markdown from "./Markdown.svelte";
   import JSONTree from "./JSONTree.svelte";
   import DataTable from "./DataTable.svelte";
   import { loadPlotly, loadVega } from "../lib/lazy_load";
@@ -112,9 +112,7 @@
       {#each cell.records as record, i}
         <div class="output-item">
           {#if record.type === "md"}
-            <div class="markdown-output">
-              {@html marked.parse(record.payload)}
-            </div>
+            <Markdown source={record.payload} variant="inline" />
           {:else if record.type === "table"}
             <DataTable
               payload={record.payload}
@@ -200,7 +198,7 @@
     width: 5px;
     height: 5px;
     border-radius: 50%;
-    background: var(--color-primary);
+    background: #b36200;
     margin-right: 7px;
     flex-shrink: 0;
     animation: nb-pulse 1.2s ease-in-out infinite;
@@ -273,49 +271,6 @@
     color: var(--fg-primary);
     white-space: pre-wrap;
     word-break: break-word;
-  }
-
-  /* Markdown custom overrides */
-  .markdown-output {
-    font-size: 0.95rem;
-    line-height: 1.6;
-    color: var(--fg-primary);
-  }
-
-  .markdown-output :global(p) {
-    margin-top: 0;
-    margin-bottom: 12px;
-  }
-
-  .markdown-output :global(p:last-child) {
-    margin-bottom: 0;
-  }
-
-  .markdown-output :global(pre) {
-    background: var(--bg-sunken);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-md);
-    padding: 12px;
-    overflow-x: auto;
-  }
-
-  .markdown-output :global(code) {
-    font-family: var(--font-mono);
-    font-size: 0.85em;
-    background: var(--bg-muted);
-    padding: 1px 3px;
-    border-radius: var(--radius-sm);
-    color: var(--color-accent);
-    line-height: 1;
-  }
-
-  .markdown-output :global(h1),
-  .markdown-output :global(h2),
-  .markdown-output :global(h3) {
-    font-family: var(--font-sans);
-    color: var(--fg-primary);
-    margin-top: 16px;
-    margin-bottom: 8px;
   }
 
   /* HTML tables and plots */
