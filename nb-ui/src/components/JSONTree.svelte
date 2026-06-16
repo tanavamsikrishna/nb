@@ -93,7 +93,7 @@
 <style>
   .json-node {
     font-family: var(--font-mono);
-    font-size: 0.875rem;
+    font-size: 0.81rem;
     line-height: 1.6;
     color: var(--fg-primary);
     text-align: left;
@@ -120,7 +120,7 @@
   }
 
   .toggle-icon {
-    font-size: 0.65rem;
+    font-size: 0.6rem;
     transition: transform 0.15s ease;
     transform: rotate(0deg);
   }
@@ -169,7 +169,7 @@
     padding: 0px 6px;
     border-radius: var(--radius-sm);
     cursor: pointer;
-    font-size: 0.75rem;
+    font-size: 0.69rem;
     color: var(--fg-secondary);
     font-family: inherit;
     line-height: 1.2;
