@@ -84,10 +84,10 @@
   <!-- Cell Header / Status Bar -->
   <div
     class="cell-header"
-    class:no-output={cell.records.length === 0 && cell.status === 'done'}
+    class:no-output={cell.records.length === 0 && cell.status === "done"}
   >
     <div class="left-header">
-      {#if cell.status === 'running'}
+      {#if cell.status === "running"}
         <div class="run-dot" aria-hidden="true"></div>
       {/if}
       {#if cell.title}
@@ -151,7 +151,7 @@
 <style>
   .cell-container {
     background: var(--bg-elevated);
-    border: 1px solid var(--nb-border, #C4C0B4);
+    border: 1px solid var(--border-default, #c4cad6);
     border-radius: 4px;
     margin-bottom: 20px;
     overflow: hidden;
@@ -160,11 +160,9 @@
       opacity 0.3s ease;
   }
 
-
-
   /* Running state */
   .cell-container.running {
-    border-left: 2px solid #8C6A10;
+    border-left: 2px solid var(--color-primary);
   }
 
   .cell-container.stale {
@@ -180,8 +178,8 @@
 
   /* Header & Stats */
   .cell-header {
-    background: #E4E0D6;
-    border-bottom: 1px solid #C4C0B4;
+    background: var(--bg-header);
+    border-bottom: 1px solid var(--border-default);
     padding: 7px 14px;
     display: flex;
     align-items: center;
@@ -202,7 +200,7 @@
     width: 5px;
     height: 5px;
     border-radius: 50%;
-    background: #8C6A10;
+    background: var(--color-primary);
     margin-right: 7px;
     flex-shrink: 0;
     animation: nb-pulse 1.2s ease-in-out infinite;
@@ -216,7 +214,7 @@
   }
 
   .cell-title {
-    color: #2C2820;
+    color: var(--fg-primary);
     font-weight: 500;
     font-size: 12px;
     font-family: var(--font-sans);
@@ -224,9 +222,9 @@
   }
 
   .stale-badge {
-    background: rgba(196, 154, 60, 0.12);
+    background: rgba(74, 111, 165, 0.1);
     color: var(--color-warning);
-    border: 1px solid rgba(196, 154, 60, 0.2);
+    border: 1px solid rgba(74, 111, 165, 0.2);
     padding: 2px 8px;
     border-radius: var(--radius-full);
     font-size: 0.75rem;
@@ -236,7 +234,7 @@
   .cell-stats {
     margin-left: auto;
     font-size: 10px;
-    color: #A09C92;
+    color: var(--fg-tertiary);
     font-family: var(--font-mono);
     display: flex;
     gap: 10px;
@@ -244,7 +242,7 @@
 
   /* Outputs Area */
   .cell-outputs {
-    background: #EAE7DE;
+    background: var(--bg-elevated);
     padding: 16px 20px;
     display: flex;
     flex-direction: column;
@@ -376,7 +374,8 @@
   }
 
   @keyframes nb-pulse {
-    0%, 100% {
+    0%,
+    100% {
       opacity: 1;
     }
     50% {

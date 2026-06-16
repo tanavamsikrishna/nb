@@ -190,7 +190,7 @@
     align-items: center;
     gap: 5px;
     font-size: 11px;
-    color: #6A8A6A;
+    color: var(--color-success);
     margin-left: auto;
   }
 
@@ -198,23 +198,23 @@
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: #5A9A5A;
+    background: var(--color-success);
   }
 
   .conn-status.disconnected {
-    color: #A04030;
+    color: var(--color-error);
   }
 
   .conn-status.disconnected .conn-dot {
-    background: #C05040;
+    background: var(--color-error);
   }
 
   .conn-status.connecting {
-    color: #8A7A5A;
+    color: var(--color-warning);
   }
 
   .conn-status.connecting .conn-dot {
-    background: #A09050;
+    background: var(--color-warning);
     animation: flash 1s infinite alternate;
   }
 

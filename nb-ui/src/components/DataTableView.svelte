@@ -224,8 +224,8 @@
     font-family: var(--font-mono);
     font-size: 0.8rem;
     color: var(--color-error);
-    background: rgba(192, 57, 43, 0.08);
-    border: 1px solid rgba(192, 57, 43, 0.2);
+    background: rgba(192, 57, 43, 0.06);
+    border: 1px solid rgba(192, 57, 43, 0.15);
     border-radius: var(--radius-md);
     padding: 8px 12px;
     margin-bottom: 8px;

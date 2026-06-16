@@ -14,29 +14,30 @@
 :root {
   /* Typography */
   --font-serif: "New York", Georgia, serif;
-  --font-sans: "Outfit", -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --font-sans: "SF Pro", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: "MonaspiceNe Nerd Font", ui-monospace, monospace;
 
-  /* Backgrounds */
-  --bg-base: #f5f5dc;
-  --bg-elevated: #EAE7DE;
-  --bg-sunken: #e8e2cc;
-  --bg-muted: #ede7cf;
-  --bg-header: #E4E0D6;
+  /* Backgrounds — slate */
+  --bg-base: #eef1f7;
+  --bg-elevated: #eaeef5;
+  --bg-sunken: #d4d8e4;
+  --bg-muted: #d4d8e4;
+  --bg-header: #e2e6ee;
 
-  /* Foreground / Text */
-  --fg-primary: #1a1a1a;
-  --fg-secondary: #6b5d4a;
-  --fg-on-accent: #1a1a1a;
+  /* Foreground / Text — slate */
+  --fg-primary: #1c2333;
+  --fg-secondary: #6b7280;
+  --fg-tertiary: #9aa0ac;
+  --fg-on-accent: #ffffff;
 
-  /* Borders */
-  --border-default: #c9c0a5;
-  --border-subtle: #C4C0B4;
+  /* Borders — slate */
+  --border-default: #c4cad6;
+  --border-subtle: #d4d8e4;
 
-  /* Primary / Accent */
-  --color-primary: #8C6A10;
-  --color-secondary: #c49a3c;
-  --color-accent: #a0845c;
+  /* Primary / Accent — steel blue, derived to harmonize with slate */
+  --color-primary: #4a6fa5;
+  --color-secondary: #6889b0;
+  --color-accent: #5a7fb0;
 
   /* Semantic */
   --color-error: #c0392b;
@@ -46,10 +47,10 @@
   --color-link: #4a7fb5;
   --color-link-visited: #7a5a9e;
 
-  /* Shadows */
-  --shadow-sm: 0 1px 2px hsla(40, 30%, 50%, 15%);
-  --shadow-md: 0 4px 6px -1px hsla(40, 30%, 50%, 20%);
-  --shadow-lg: 0 10px 15px -3px hsla(40, 30%, 50%, 25%);
+  /* Shadows — slate */
+  --shadow-sm: 0 1px 2px hsla(220, 20%, 50%, 12%);
+  --shadow-md: 0 4px 6px -1px hsla(220, 20%, 50%, 16%);
+  --shadow-lg: 0 10px 15px -3px hsla(220, 20%, 50%, 20%);
 
   /* Spacing / Radii */
   --radius-sm: 4px;
@@ -63,16 +64,16 @@
   --color-interactive: var(--color-primary);
   --color-surface-tint: var(--color-accent);
 
-  /* Interactive states */
-  --color-interactive-hover: #6e530f;
-  --color-interactive-active: #52400b;
+  /* Interactive states — slate */
+  --color-interactive-hover: #3a5a8a;
+  --color-interactive-active: #2d4a70;
   --color-focus-ring: var(--color-primary);
-  --color-focus-ring-offset: #f5f5dc;
+  --color-focus-ring-offset: #eef1f7;
 
-  /* Code surfaces */
-  --fg-code: #5a3e1b;
-  --bg-code-inline: #ede7cf;
-  --bg-code-block: #e8e2cc;
+  /* Code surfaces — slate */
+  --fg-code: #3d4f6a;
+  --bg-code-inline: #d4d8e4;
+  --bg-code-block: #d4d8e4;
 
   /* Spacing scale */
   --space-1: 4px;
@@ -83,7 +84,7 @@
   --space-8: 32px;
   --space-12: 48px;
 
-  /* Selection */
-  --color-selection-bg: #e6c97a;
-  --color-selection-fg: #000000;
+  /* Selection — slate */
+  --color-selection-bg: #b8c5da;
+  --color-selection-fg: #1c2333;
 }
