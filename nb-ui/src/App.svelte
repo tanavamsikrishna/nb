@@ -47,17 +47,15 @@
         {/if}
       </div>
 
-      <div class="status-badge {$connectionStatus}">
-        <span class="badge-dot"></span>
-        <span class="badge-text">
-          {#if $connectionStatus === "connected"}
-            connected to daemon
-          {:else if $connectionStatus === "connecting"}
-            connecting...
-          {:else}
-            disconnected
-          {/if}
-        </span>
+      <div class="conn-status {$connectionStatus}">
+        <div class="conn-dot"></div>
+        {#if $connectionStatus === "connected"}
+          connected to daemon
+        {:else if $connectionStatus === "connecting"}
+          connecting...
+        {:else}
+          disconnected
+        {/if}
       </div>
     </div>
   </header>
@@ -186,57 +184,38 @@
     border-radius: var(--radius-sm);
   }
 
-  /* Connection badge */
-  .status-badge {
+  /* Connection status */
+  .conn-status {
     display: flex;
     align-items: center;
-    gap: 8px;
-    background: var(--bg-muted);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-full);
-    padding: 6px 14px;
-    font-size: 0.75rem;
-    font-weight: 500;
-    transition: all 0.3s ease;
+    gap: 5px;
+    font-size: 11px;
+    color: #6A8A6A;
+    margin-left: auto;
   }
 
-  .badge-dot {
+  .conn-dot {
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background-color: var(--fg-secondary);
+    background: #5A9A5A;
   }
 
-  .status-badge.connected {
-    background: rgba(46, 125, 50, 0.08);
-    border-color: rgba(46, 125, 50, 0.25);
-    color: var(--color-success);
+  .conn-status.disconnected {
+    color: #A04030;
   }
 
-  .status-badge.connected .badge-dot {
-    background-color: var(--color-success);
-    box-shadow: 0 0 8px var(--color-success);
+  .conn-status.disconnected .conn-dot {
+    background: #C05040;
   }
 
-  .status-badge.connecting {
-    background: rgba(196, 154, 60, 0.08);
-    border-color: rgba(196, 154, 60, 0.25);
-    color: var(--color-warning);
+  .conn-status.connecting {
+    color: #8A7A5A;
   }
 
-  .status-badge.connecting .badge-dot {
-    background-color: var(--color-warning);
+  .conn-status.connecting .conn-dot {
+    background: #A09050;
     animation: flash 1s infinite alternate;
-  }
-
-  .status-badge.disconnected {
-    background: rgba(192, 57, 43, 0.08);
-    border-color: rgba(192, 57, 43, 0.25);
-    color: var(--color-error);
-  }
-
-  .status-badge.disconnected .badge-dot {
-    background-color: var(--color-error);
   }
 
   /* Container */

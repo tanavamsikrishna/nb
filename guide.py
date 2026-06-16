@@ -46,7 +46,7 @@ def get_data(repeat: int) -> pl.DataFrame:
 display(MD("# This is a header\n`hi`"))
 
 # HTML -- display a `HTML`
-display(HTML("<p style='color: #2563eb;'>This HTML text is styled directly.</p>"))
+display(HTML("<p style='color: green;'>This HTML text is styled directly.</p>"))
 
 # polars table -- display a `DataFrame`
 display(get_data(3))

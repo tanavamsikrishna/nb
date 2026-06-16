@@ -82,9 +82,14 @@
     : ''}"
 >
   <!-- Cell Header / Status Bar -->
-  <div class="cell-header">
+  <div
+    class="cell-header"
+    class:no-output={cell.records.length === 0 && cell.status === 'done'}
+  >
     <div class="left-header">
-      <span class="status-indicator"></span>
+      {#if cell.status === 'running'}
+        <div class="run-dot" aria-hidden="true"></div>
+      {/if}
       {#if cell.title}
         <span class="cell-title">{cell.title}</span>
       {/if}
@@ -93,42 +98,10 @@
       {/if}
     </div>
 
-    {#if cell.profiling}
-      <div class="profiling-stats">
-        <span class="stat-item">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-            class="icon"
-          >
-            <path
-              fill-rule="evenodd"
-              d="M10 18a8 8 0 100-16 8 8 0 000 16zm.5-13a.75.75 0 00-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 000-1.5h-3.25V5z"
-              clip-rule="evenodd"
-            />
-          </svg>
-          {cell.profiling.wall_ms}ms wall
-        </span>
-        <span class="stat-divider">•</span>
-        <span class="stat-item">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-            class="icon"
-          >
-            <path
-              d="M12 9a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1V9z"
-            />
-            <path
-              fill-rule="evenodd"
-              d="M19.307 2.193a.75.75 0 00-1.147-.193l-3.58 3.033A2.247 2.247 0 0013.25 5H6.75A2.25 2.25 0 004.5 7.25v5.5A2.25 2.25 0 006.75 15h6.5a2.24 2.24 0 001.33-.433l3.58 3.033a.75.75 0 001.147-.193c.12-.224.08-.502-.103-.686l-2.029-2.03A3.722 3.722 0 0018 12.75v-5.5c0-1.042-.435-1.983-1.135-2.656l2.029-2.03a.75.75 0 00.413-.671zM15 7.25v5.5a.75.75 0 01-.75.75h-6.5a.75.75 0 01-.75-.75v-5.5a.75.75 0 01.75-.75h6.5a.75.75 0 01.75.75z"
-              clip-rule="evenodd"
-            />
-          </svg>
-          {cell.profiling.cpu_ms}ms cpu
-        </span>
+    {#if cell.profiling && (cell.profiling.wall_ms >= 1 || cell.profiling.cpu_ms >= 1)}
+      <div class="cell-stats">
+        <span>{cell.profiling.wall_ms}ms wall</span>
+        <span>{cell.profiling.cpu_ms}ms cpu</span>
       </div>
     {/if}
   </div>
@@ -178,30 +151,20 @@
 <style>
   .cell-container {
     background: var(--bg-elevated);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-lg);
+    border: 1px solid var(--nb-border, #C4C0B4);
+    border-radius: 4px;
     margin-bottom: 20px;
     overflow: hidden;
     transition:
       border-color 0.3s ease,
-      box-shadow 0.3s ease,
       opacity 0.3s ease;
-    box-shadow: var(--shadow-md);
   }
 
-  .cell-container:hover {
-    border-color: var(--border-default);
-  }
 
-  /* Status specific styles */
+
+  /* Running state */
   .cell-container.running {
-    border-color: var(--color-primary);
-    box-shadow: 0 0 15px rgba(139, 105, 20, 0.2);
-  }
-
-  .cell-container.error {
-    border-color: var(--color-error);
-    box-shadow: 0 0 15px rgba(192, 57, 43, 0.15);
+    border-left: 2px solid #8C6A10;
   }
 
   .cell-container.stale {
@@ -217,12 +180,16 @@
 
   /* Header & Stats */
   .cell-header {
+    background: #E4E0D6;
+    border-bottom: 1px solid #C4C0B4;
+    padding: 7px 14px;
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    padding: 10px 16px;
-    background: var(--bg-header);
-    border-bottom: 1px solid var(--border-subtle);
+    justify-content: space-between;
+  }
+
+  .cell-header.no-output {
+    border-bottom: none;
   }
 
   .left-header {
@@ -231,34 +198,14 @@
     gap: 10px;
   }
 
-  .status-indicator {
-    width: 8px;
-    height: 8px;
+  .run-dot {
+    width: 5px;
+    height: 5px;
     border-radius: 50%;
-    background-color: var(--fg-secondary);
-    transition:
-      background-color 0.3s ease,
-      box-shadow 0.3s ease;
-  }
-
-  .cell-container.pending .status-indicator {
-    background-color: var(--fg-secondary);
-  }
-
-  .cell-container.running .status-indicator {
-    background-color: var(--color-primary);
-    box-shadow: 0 0 8px var(--color-primary);
-    animation: pulse 1.5s infinite alternate;
-  }
-
-  .cell-container.done .status-indicator {
-    background-color: var(--color-success);
-    box-shadow: 0 0 6px rgba(46, 125, 50, 0.4);
-  }
-
-  .cell-container.error .status-indicator {
-    background-color: var(--color-error);
-    box-shadow: 0 0 8px var(--color-error);
+    background: #8C6A10;
+    margin-right: 7px;
+    flex-shrink: 0;
+    animation: nb-pulse 1.2s ease-in-out infinite;
   }
 
   .cell-name {
@@ -269,9 +216,9 @@
   }
 
   .cell-title {
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--color-primary);
+    color: #2C2820;
+    font-weight: 500;
+    font-size: 12px;
     font-family: var(--font-sans);
     letter-spacing: 0.01em;
   }
@@ -286,33 +233,19 @@
     font-weight: 500;
   }
 
-  .profiling-stats {
+  .cell-stats {
+    margin-left: auto;
+    font-size: 10px;
+    color: #A09C92;
+    font-family: var(--font-mono);
     display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 0.75rem;
-    color: var(--fg-secondary);
-  }
-
-  .stat-item {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-  }
-
-  .icon {
-    width: 12px;
-    height: 12px;
-    opacity: 0.7;
-  }
-
-  .stat-divider {
-    color: var(--border-default);
+    gap: 10px;
   }
 
   /* Outputs Area */
   .cell-outputs {
-    padding: 16px;
+    background: #EAE7DE;
+    padding: 16px 20px;
     display: flex;
     flex-direction: column;
     gap: 16px;
@@ -442,12 +375,12 @@
     font-weight: 500;
   }
 
-  @keyframes pulse {
-    0% {
-      opacity: 0.6;
-    }
-    100% {
+  @keyframes nb-pulse {
+    0%, 100% {
       opacity: 1;
+    }
+    50% {
+      opacity: 0.3;
     }
   }
 

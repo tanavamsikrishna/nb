@@ -19,10 +19,10 @@
 
   /* Backgrounds */
   --bg-base: #f5f5dc;
-  --bg-elevated: #faf6e7;
+  --bg-elevated: #EAE7DE;
   --bg-sunken: #e8e2cc;
   --bg-muted: #ede7cf;
-  --bg-header: #e2dcc8;
+  --bg-header: #E4E0D6;
 
   /* Foreground / Text */
   --fg-primary: #1a1a1a;
@@ -31,10 +31,10 @@
 
   /* Borders */
   --border-default: #c9c0a5;
-  --border-subtle: #d4cbb0;
+  --border-subtle: #C4C0B4;
 
   /* Primary / Accent */
-  --color-primary: #8b6914;
+  --color-primary: #8C6A10;
   --color-secondary: #c49a3c;
   --color-accent: #a0845c;
 
