@@ -57,6 +57,8 @@ class Table:
     """Wrapper for Polars DataFrames to enable interactive table display."""
 
     df: Any  # pl.DataFrame — typed as Any to avoid hard import at module level
+    floating_point_accuracy: int = 4  # floating point precision to show
+    label: str | None = None  # title
 
 
 def _serialize_table(obj: Table) -> dict:

@@ -3,7 +3,6 @@ import shutil
 import socket
 import subprocess
 import sys
-import time
 from pathlib import Path
 
 import click
@@ -22,58 +21,26 @@ def main() -> None:
 @click.argument("notebook", type=click.Path(exists=True, dir_okay=False, path_type=Path))
 def run(notebook: Path) -> None:
     notebook_path = notebook.resolve()
-    project_dir = notebook_path.parent.resolve()
+    project_dir = Path.cwd()
     socket_path = project_dir / ".nb.sock"
 
-    connected = False
     s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
 
     if socket_path.exists():
         try:
             s.connect(str(socket_path))
-            connected = True
         except (socket.error, ConnectionRefusedError):
             # Clean up stale socket file
             try:
                 socket_path.unlink()
             except Exception:
                 pass
-
-    if not connected:
-        # Spawn daemon process in background
-        cmd = [sys.executable, "-m", "nb.cli", "_daemon", str(project_dir)]
-        try:
-            subprocess.Popen(
-                cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True
-            )
-        except Exception as e:
-            click.echo(f"Error starting background daemon: {e}", err=True)
+            click.echo("Could not connect to daemon. Is it running?", err=True)
             sys.exit(1)
-
-        # Poll until socket appears and accepts connection
-        start_time = time.time()
-        while time.time() - start_time < 3.0:
-            if socket_path.exists():
-                try:
-                    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-                    s.connect(str(socket_path))
-                    connected = True
-                    break
-                except (socket.error, ConnectionRefusedError):
-                    pass
-            time.sleep(0.1)
-
-        if not connected:
-            click.echo("Failed to start daemon or connect to socket within 3 seconds.", err=True)
-            sys.exit(1)
-        else:
-            import webbrowser
-
-            webbrowser.open(NOTEBOOK_URL)
-            time.sleep(0.5)
 
     # Request notebook run
     req = {"path": str(notebook_path)}
+    print(f"Requesting notebook run with params: {req}")
     try:
         s.sendall(json.dumps(req).encode("utf-8") + b"\n")
         resp_data = s.recv(4096)
