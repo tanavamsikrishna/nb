@@ -1,7 +1,9 @@
 import asyncio
 import json
 import os
+import re
 import signal
+import webbrowser
 from pathlib import Path
 from typing import Set
 
@@ -126,6 +128,26 @@ async def handle_ipc_client(reader: asyncio.StreamReader, writer: asyncio.Stream
                 pass
 
 
+async def open_site_in_browser(site_url):
+    await asyncio.sleep(0.5)
+
+    process = await asyncio.subprocess.create_subprocess_exec(
+        "chrome-cli", "list", "tabs", stdout=asyncio.subprocess.PIPE
+    )
+    stdout, _ = await process.communicate()
+    tab_infos = stdout.decode().strip().splitlines()
+
+    tab_ids = [g.group(1) for e in tab_infos if (g := re.match(r"\[(?:\d+:)?(\d+)\] nb-ui", e))]
+    if len(tab_ids) > 0:
+        tab_id = tab_ids[0]
+        active_process = await asyncio.subprocess.create_subprocess_exec(
+            "chrome-cli", "activate", "-t", tab_id
+        )
+        await active_process.wait()
+    else:
+        webbrowser.open(site_url)
+
+
 async def main(project_dir: Path, *, host: str = "0.0.0.0", port: int = 7777) -> None:
     socket_path = project_dir / ".nb.sock"
     if socket_path.exists():
@@ -149,9 +171,11 @@ async def main(project_dir: Path, *, host: str = "0.0.0.0", port: int = 7777) ->
     site = web.TCPSite(runner_http, host, port)
     await site.start()
 
-    print(
-        f"Daemon started. Unix socket at {socket_path}, HTTP at http://localhost:{port}", flush=True
-    )
+    site_url = f"http://localhost:{port}"
+
+    print(f"Daemon started. Unix socket at {socket_path}, HTTP at {site_url}", flush=True)
+
+    _task = asyncio.create_task(open_site_in_browser(site_url))
 
     # Graceful shutdown event — triggered by SIGINT/SIGTERM
     # First signal: graceful shutdown. Second signal: force exit.
