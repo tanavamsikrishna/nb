@@ -10,7 +10,10 @@ export function loadPlotly() {
       return;
     }
     const script = document.createElement("script");
-    script.src = "https://cdn.plot.ly/plotly-2.24.1.min.js";
+    // 3.x is required to decode the base64 typed-array format ({dtype, bdata})
+    // that plotly.py 6.x emits for numeric arrays; older builds silently
+    // misrender the data. Keep in sync with the installed plotly.py major.
+    script.src = "https://cdn.plot.ly/plotly-3.0.1.min.js";
     script.onload = () => resolve(window.Plotly);
     script.onerror = (e) => {
       plotlyPromise = null;
