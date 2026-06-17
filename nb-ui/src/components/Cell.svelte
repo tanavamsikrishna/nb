@@ -33,12 +33,11 @@
     loadPlotly()
       .then((Plotly) => {
         if (active) {
-          Plotly.newPlot(
-            node,
-            payload.data,
-            payload.layout,
-            payload.config || {},
-          );
+          // Default to a usable height; without one Plotly falls back to the
+          // container's height  and collapses. The figure's own layout.height still wins if it sets one.
+          const layout = { autosize: true, height: 450, ...payload.layout };
+          const config = { responsive: true, ...(payload.config || {}) };
+          Plotly.newPlot(node, payload.data, layout, config);
         }
       })
       .catch((err) => {
