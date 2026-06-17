@@ -117,7 +117,7 @@
       <thead>
         <tr>
           {#each columns as col}
-            <th class:numeric={col.numeric}>
+            <th class:numeric={col.numeric} title={col.name}>
               <span class="col-name">{col.name}</span>
             </th>
           {/each}
@@ -127,7 +127,10 @@
         {#each rows as row, i (i)}
           <tr>
             {#each columns as col}
-              <td class:numeric={col.numeric}>
+              <td
+                class:numeric={col.numeric}
+                title={row[col.name] === null ? "" : String(row[col.name])}
+              >
                 {#if row[col.name] === null}
                   <span class="null-val">—</span>
                 {:else}
@@ -246,7 +249,11 @@
 
   table {
     border-collapse: collapse;
-    width: 100%;
+    /* Table hugs the combined width of its columns; each column hugs its own
+       content (table-layout: auto). When that exceeds the container the
+       .table-scroll wrapper scrolls horizontally. */
+    width: max-content;
+    table-layout: auto;
     font-size: 0.85rem;
   }
 
@@ -258,6 +265,11 @@
     padding: 8px 12px;
     border-bottom: 1px solid var(--border-default);
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    /* Generous cap so a single long-value column can't dominate; content
+       beyond this truncates with an ellipsis. */
+    max-width: 480px;
   }
 
   thead th.numeric {
@@ -268,6 +280,12 @@
     padding: 6px 12px;
     border-bottom: 1px solid var(--border-subtle);
     color: var(--fg-primary);
+    /* Hug content on one line, capped at the same generous max-width as the
+       header; full value is available via the cell's title tooltip. */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 480px;
   }
 
   tbody td.numeric {
