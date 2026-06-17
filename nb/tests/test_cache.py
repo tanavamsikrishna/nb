@@ -9,7 +9,8 @@ from nb.framework import (
     _cache,
     _check_purity,
     _hash_value,
-    clear_cache,
+    clear_all_cache,
+    clear_cache_by_name,
     display,
     nb_cache,
 )
@@ -63,7 +64,7 @@ def test_hash_value() -> None:
 
 
 def test_nb_cache_decorator() -> None:
-    clear_cache()
+    clear_all_cache()
     call_count = 0
 
     @nb_cache
@@ -85,7 +86,7 @@ def test_nb_cache_decorator() -> None:
 
 
 def test_nb_cache_captures_and_replays_display() -> None:
-    clear_cache()
+    clear_all_cache()
     emitted: list[DisplayRecord] = []
     old_emitter = fw._active_emitter
     fw._active_emitter = emitted.append
@@ -113,7 +114,7 @@ def test_nb_cache_captures_and_replays_display() -> None:
 
 
 def test_nb_cache_keys() -> None:
-    clear_cache()
+    clear_all_cache()
 
     # Establish globals in the module level for testing
     global WINDOW
@@ -139,15 +140,59 @@ def test_nb_cache_keys() -> None:
     assert call_count == 2
 
 
-def test_clear_cache() -> None:
-    clear_cache()
+def test_clear_cache_by_name() -> None:
+    clear_all_cache()
 
     @nb_cache
     def mult(x: int, y: int) -> int:
         return x * y
 
+    @nb_cache
+    def add(x: int, y: int) -> int:
+        return x + y
+
     mult(2, 3)
+    add(2, 3)
+    assert len(_cache) == 2
+
+    # Clearing by short name removes only matching entries and reports the count.
+    removed = clear_cache_by_name(["mult"])
+    assert removed == 1
     assert len(_cache) == 1
 
-    clear_cache(mult)
-    assert len(_cache) == 0
+    # A name that matches nothing is a no-op.
+    assert clear_cache_by_name(["does_not_exist"]) == 0
+    assert len(_cache) == 1
+
+
+def test_clear_cache_by_name_nested() -> None:
+    clear_all_cache()
+
+    @nb_cache
+    def outer(x: int) -> int:
+        @nb_cache
+        def inner(y: int) -> int:
+            return y * 2
+
+        return inner(x) + 1
+
+    outer(5)
+    # Two entries: outer and the nested inner.
+    assert len(_cache) == 2
+
+    inner_qualname = f"{outer.__qualname__}.<locals>.inner"
+
+    # The nested function can be cleared by its short name, without calling
+    # anything inside outer.
+    assert clear_cache_by_name(["inner"]) == 1
+    assert len(_cache) == 1
+    assert clear_cache_by_name([inner_qualname]) == 0  # already gone
+
+    # Repopulate both entries (outer is cached too, so it must be cleared for its
+    # body — and thus inner — to re-run).
+    clear_all_cache()
+    outer(5)
+    assert len(_cache) == 2
+
+    # The nested function can also be cleared by its full qualname.
+    assert clear_cache_by_name([inner_qualname]) == 1

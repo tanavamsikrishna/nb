@@ -109,7 +109,13 @@ def parse_notebook(source: str) -> Tuple[str | None, List[Cell]]:
     return docstring, cells
 
 
-def run_notebook(path: Path, exec_ns: dict, emit_event: Callable[[str, dict], None]) -> None:
+def run_notebook(
+    path: Path,
+    exec_ns: dict,
+    emit_event: Callable[[str, dict], None],
+    clear_cache_names: list[str] | None = None,
+    clear_cache_all: bool = False,
+) -> None:
     try:
         with open(path, "r", encoding="utf-8") as f:
             source = f.read()
@@ -129,12 +135,18 @@ def run_notebook(path: Path, exec_ns: dict, emit_event: Callable[[str, dict], No
     cell_manifest = [{"id": cell.id, "title": cell.title} for cell in cells]
     emit_event("run_start", {"cell_manifest": cell_manifest})
 
+    # Invalidate caches as requested before running any cell, so cached functions
+    # recompute on this run. Operates on the persistent fw._cache (not exec_ns).
+    if clear_cache_all:
+        fw.clear_all_cache()
+    elif clear_cache_names:
+        fw.clear_cache_by_name(clear_cache_names)
+
     # Prepare execution namespace
     exec_ns.setdefault("__name__", "__main__")
     exec_ns.setdefault("__builtins__", __builtins__)
     exec_ns.setdefault("display", fw.display)
     exec_ns.setdefault("nb_cache", fw.nb_cache)
-    exec_ns.setdefault("clear_cache", fw.clear_cache)
 
     old_emitter = fw._active_emitter
     installed_runner_emitter = old_emitter is None

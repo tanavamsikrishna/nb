@@ -11,7 +11,7 @@ from datetime import date
 import plotly.express as px
 import polars as pl
 
-from nb import clear_cache, display, nb_cache
+from nb import display, nb_cache
 
 DATA_MULTIPLIER = 2
 
@@ -91,17 +91,6 @@ display(fig)
 # import altair as alt
 # chart = alt.Chart(df).mark_bar().encode(x="x", y="y")
 # display(chart)
-
-# %% Cache Management
-
-# Clear one function's cached entries (forces re-run on next call)
-clear_cache(get_data)
-
-# Clear all cached entries
-clear_cache()
-
-# Note: clear_cache(func) is a silent no-op if func has never been called
-# in the current process (no _cache_keys set yet). No error is raised.
 
 # %% Caveats
 

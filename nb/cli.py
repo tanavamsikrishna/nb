@@ -19,7 +19,17 @@ def main() -> None:
 
 @main.command()
 @click.argument("notebook", type=click.Path(exists=True, dir_okay=False, path_type=Path))
-def run(notebook: Path) -> None:
+@click.option(
+    "--clear-cache",
+    "clear_cache",
+    is_flag=False,
+    flag_value="\x00ALL",
+    default=None,
+    metavar="NAMES",
+    help="Comma-separated function names whose @nb_cache entries to clear before running "
+    "(matches the short name or qualname). Pass with no value to clear the entire cache.",
+)
+def run(notebook: Path, clear_cache: str | None) -> None:
     notebook_path = notebook.resolve()
     project_dir = Path.cwd()
     socket_path = project_dir / ".nb.sock"
@@ -39,7 +49,16 @@ def run(notebook: Path) -> None:
             sys.exit(1)
 
     # Request notebook run
-    req = {"path": str(notebook_path)}
+    req: dict = {"path": str(notebook_path)}
+    if clear_cache == "\x00ALL":
+        if not click.confirm("Clear the entire cache?", default=False):
+            click.echo("Aborted.")
+            sys.exit(0)
+        req["clear_cache_all"] = True
+    elif clear_cache is not None:
+        names = [n.strip() for n in clear_cache.split(",") if n.strip()]
+        if names:
+            req["clear_cache"] = names
     print(f"Requesting notebook run with params: {req}")
     try:
         s.sendall(json.dumps(req).encode("utf-8") + b"\n")

@@ -69,6 +69,8 @@ async def handle_ipc_client(reader: asyncio.StreamReader, writer: asyncio.Stream
 
             req = json.loads(line.decode("utf-8"))
             notebook_path = Path(req["path"])
+            clear_cache_names = req.get("clear_cache")  # list[str] | None
+            clear_cache_all = req.get("clear_cache_all", False)
 
             loop = asyncio.get_running_loop()
 
@@ -96,12 +98,17 @@ async def handle_ipc_client(reader: asyncio.StreamReader, writer: asyncio.Stream
                     "__builtins__": __builtins__,
                     "display": fw.display,
                     "nb_cache": fw.nb_cache,
-                    "clear_cache": fw.clear_cache,
                 }
 
                 # Execute notebook in separate thread so exec doesn't block the main event loop
                 await loop.run_in_executor(
-                    None, runner.run_notebook, notebook_path, exec_ns, thread_safe_emit_event
+                    None,
+                    runner.run_notebook,
+                    notebook_path,
+                    exec_ns,
+                    thread_safe_emit_event,
+                    clear_cache_names,
+                    clear_cache_all,
                 )
 
                 resp = {"status": "ok"}

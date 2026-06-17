@@ -38,3 +38,24 @@ uv run nb daemon .
 # Terminal 2 — trigger execution
 uv run nb run <notebook.py>
 ```
+
+## Cache Management
+
+Caches are invalidated from the command line, not from notebook code.
+
+```bash
+uv run nb run mynotebook.py --clear-cache get_data          # clear one function
+uv run nb run mynotebook.py --clear-cache get_data,build    # clear several (comma-separated)
+uv run nb run mynotebook.py --clear-cache                   # clear everything (prompts to confirm)
+```
+
+Names match either a function's short name or its qualname. A short name clears **all** entries
+with that name — so if two functions in different scopes share a short name (e.g. two nested
+functions both called `inner`, or a nested and a top-level function both called `process`),
+both are cleared. Use the full qualname to target only one:
+
+```bash
+uv run nb run mynotebook.py --clear-cache "outer1.<locals>.inner"   # only this one
+```
+
+A name that matches nothing is a harmless no-op.
