@@ -1,17 +1,17 @@
-import pytest
 import numpy as np
 import polars as pl
+import pytest
 from pydantic import BaseModel
+
 import nb.framework as fw
 from nb.framework import (
     DisplayRecord,
-    MD,
+    _cache,
     _check_purity,
     _hash_value,
+    clear_cache,
     display,
     nb_cache,
-    _cache,
-    clear_cache,
 )
 
 
@@ -97,7 +97,7 @@ def test_nb_cache_captures_and_replays_display() -> None:
         def greet(name: str) -> str:
             nonlocal call_count
             call_count += 1
-            display(MD(f"Hello {name}"))
+            display(f"Hello {name}", as_="md")
             return name.upper()
 
         assert greet("Ada") == "ADA"

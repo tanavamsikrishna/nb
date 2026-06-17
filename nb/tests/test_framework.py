@@ -2,20 +2,13 @@ import base64
 import io
 
 import polars as pl
-import pytest
 
-from nb.framework import Table, DisplayRecord, _create_display_record
-
-
-def test_table_dataclass():
-    df = pl.DataFrame({"a": [1, 2, 3], "b": ["x", "y", "z"]})
-    table = Table(df)
-    assert table.df is df
+from nb.framework import DisplayRecord, _create_display_record
 
 
 def test_table_serialization():
     df = pl.DataFrame({"a": [1, 2, 3], "b": ["x", "y", "z"]})
-    record = _create_display_record(Table(df))
+    record = _create_display_record(df, "table")
 
     assert isinstance(record, DisplayRecord)
     assert record.type == "table"
@@ -32,15 +25,40 @@ def test_table_serialization():
     assert result.equals(df)
 
 
-def test_table_auto_dispatch():
-    """Table should be dispatched before plain Polars DataFrame."""
+def test_table_options_passed_through():
     df = pl.DataFrame({"x": [10, 20]})
-    record = _create_display_record(Table(df))
-    assert record.type == "table"
+    record = _create_display_record(df, "table", floating_point_accuracy=2, label="My table")
+    assert record.payload["floating_point_accuracy"] == 2
+    assert record.payload["label"] == "My table"
 
 
-def test_plain_dataframe_still_html():
-    """Plain Polars DataFrame (not wrapped) should still render as table."""
+def test_plain_dataframe_auto_table():
+    """Plain Polars DataFrame should auto-detect as a table."""
     df = pl.DataFrame({"x": [10, 20]})
     record = _create_display_record(df)
     assert record.type == "table"
+
+
+def test_str_defaults_to_text():
+    record = _create_display_record("hello")
+    assert record.type == "text"
+    assert record.payload == "hello"
+
+
+def test_explicit_md_and_html():
+    assert _create_display_record("# h", "md") == DisplayRecord(type="md", payload="# h")
+    assert _create_display_record("<p>", "html") == DisplayRecord(type="html", payload="<p>")
+    assert _create_display_record("# h", "text") == DisplayRecord(type="text", payload="# h")
+
+
+def test_object_fallback():
+    """Non-str, non-special objects fall back to a serialized object record."""
+    record = _create_display_record({"k": "v", "n": [1, 2]})
+    assert record.type == "object"
+    assert record.payload == {"k": "v", "n": [1, 2]}
+
+
+def test_explicit_object():
+    record = _create_display_record({"a": 1}, "object")
+    assert record.type == "object"
+    assert record.payload == {"a": 1}

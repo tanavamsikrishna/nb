@@ -6,7 +6,7 @@ import pickle
 import types
 from dataclasses import dataclass
 from functools import wraps
-from typing import Any, Callable, TypeVar, cast
+from typing import Any, Callable, Literal, TypeVar, cast, overload
 
 F = TypeVar("F", bound=Callable)
 
@@ -36,40 +36,17 @@ def _emit(record: DisplayRecord) -> None:
         _active_emitter(record)
 
 
-# Wrapper types
-class MD:
-    def __init__(self, text: str):
-        self.text = text
-
-
-class HTML:
-    def __init__(self, text: str):
-        self.text = text
-
-
-class Object:
-    def __init__(self, obj: Any):
-        self.obj = obj
-
-
-@dataclass
-class Table:
-    """Wrapper for Polars DataFrames to enable interactive table display."""
-
-    df: Any  # pl.DataFrame — typed as Any to avoid hard import at module level
-    floating_point_accuracy: int = 4  # floating point precision to show
-    label: str | None = None  # title
-
-
-def _serialize_table(obj: Table) -> dict:
+def _serialize_table(df: Any, floating_point_accuracy: int = 4, label: str | None = None) -> dict:
     import base64
     import io
 
     buf = io.BytesIO()
-    obj.df.write_parquet(buf, compression="snappy")
+    df.write_parquet(buf, compression="snappy")
     return {
         "data": base64.b64encode(buf.getvalue()).decode(),
-        "total_rows": len(obj.df),
+        "total_rows": len(df),
+        "floating_point_accuracy": floating_point_accuracy,
+        "label": label,
     }
 
 
@@ -83,7 +60,31 @@ def _serialize_object(obj: Any) -> Any:
         raise TypeError(f"Object display payload is not JSON serializable: {type(obj)!r}") from exc
 
 
-def _create_display_record(obj: Any) -> DisplayRecord:
+def _create_display_record(
+    obj: Any,
+    as_: str | None = None,
+    *,
+    floating_point_accuracy: int = 4,
+    label: str | None = None,
+) -> DisplayRecord:
+    # Explicit type selection via `as_`
+    if as_ is not None:
+        if as_ == "md":
+            return DisplayRecord(type="md", payload=str(obj))
+        if as_ == "html":
+            return DisplayRecord(type="html", payload=str(obj))
+        if as_ == "text":
+            return DisplayRecord(type="text", payload=str(obj))
+        if as_ == "object":
+            return DisplayRecord(type="object", payload=_serialize_object(obj))
+        if as_ == "table":
+            return DisplayRecord(
+                type="table",
+                payload=_serialize_table(obj, floating_point_accuracy, label),
+            )
+        raise ValueError(f"Unknown display type as_={as_!r}")
+
+    # Auto-detect when `as_` is omitted
     # 1. Plotly
     try:
         from plotly.basedatatypes import BaseFigure
@@ -102,41 +103,52 @@ def _create_display_record(obj: Any) -> DisplayRecord:
     except (ImportError, AttributeError):
         pass
 
-    # 3. Table wrapper (must come before plain Polars DataFrame)
-    if isinstance(obj, Table):
-        return DisplayRecord(type="table", payload=_serialize_table(obj))
-
-    # 4. Polars
+    # 3. Polars DataFrame -> table
     try:
         import polars as pl
 
         if isinstance(obj, pl.DataFrame):
-            return _create_display_record(Table(obj))
+            return DisplayRecord(
+                type="table",
+                payload=_serialize_table(obj, floating_point_accuracy, label),
+            )
     except ImportError:
         pass
 
-    # 5. MD Wrapper
-    if isinstance(obj, MD):
-        return DisplayRecord(type="md", payload=obj.text)
-
-    # 6. HTML Wrapper
-    if isinstance(obj, HTML):
-        return DisplayRecord(type="html", payload=obj.text)
-
-    # 7. String Wrapper
+    # 4. Plain strings -> text
     if isinstance(obj, str):
         return DisplayRecord(type="text", payload=obj)
 
-    # 8. Object Wrapper
-    if isinstance(obj, Object):
-        return DisplayRecord(type="object", payload=_serialize_object(obj.obj))
-
-    # Fallback
-    return DisplayRecord(type="text", payload=repr(obj))
+    # 5. Fallback: everything else -> object
+    return DisplayRecord(type="object", payload=_serialize_object(obj))
 
 
-def display(obj: Any) -> None:
-    _emit(_create_display_record(obj))
+@overload
+def display(obj: Any) -> None: ...
+@overload
+def display(obj: str, *, as_: Literal["md", "html", "text"]) -> None: ...
+@overload
+def display(obj: Any, *, as_: Literal["object"]) -> None: ...
+@overload
+def display(
+    obj: Any,
+    *,
+    as_: Literal["table"] = ...,
+    floating_point_accuracy: int = ...,
+    label: str | None = ...,
+) -> None: ...
+def display(
+    obj: Any,
+    *,
+    as_: Literal["md", "html", "text", "object", "table"] | None = None,
+    floating_point_accuracy: int = 4,
+    label: str | None = None,
+) -> None:
+    _emit(
+        _create_display_record(
+            obj, as_, floating_point_accuracy=floating_point_accuracy, label=label
+        )
+    )
 
 
 # Type-dispatch hashing
@@ -244,8 +256,16 @@ def nb_cache(func: F | None = None, *, keys: list[str] | None = None) -> F:
 
         _capture_stack: list[list[DisplayRecord]] = []
 
-        def nb_display(obj):
-            record = _create_display_record(obj)
+        def nb_display(
+            obj: Any,
+            *,
+            as_: str | None = None,
+            floating_point_accuracy: int = 4,
+            label: str | None = None,
+        ) -> None:
+            record = _create_display_record(
+                obj, as_, floating_point_accuracy=floating_point_accuracy, label=label
+            )
             if _capture_stack:
                 _capture_stack[-1].append(record)
             _emit(record)

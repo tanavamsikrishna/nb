@@ -33,17 +33,17 @@ from datetime import date
 import plotly.express as px
 import polars as pl
 
-from nb import HTML, MD, Object, Table, display, nb_cache
+from nb import display, nb_cache
 
 # %% Introduction
-display(MD("# Welcome to the `nb` runner!"))
-display(HTML("<p style='color: #2563eb;'>This HTML text is styled directly.</p>"))
+display("# Welcome to the `nb` runner!", as_="md")
+display("<p style='color: #2563eb;'>This HTML text is styled directly.</p>", as_="html")
 
 for _ in range(2):
     time.sleep(1)
     display("show something")
 
-display(MD("## Sample numpy"))
+display("## Sample numpy", as_="md")
 # Generate mock sample data
 df = pl.DataFrame(
     {
@@ -60,7 +60,7 @@ df = pl.DataFrame(
         "is_active": [True, False, True, True, False],
     }
 )
-display(Table(pl.concat([df] * 10)))
+display(pl.concat([df] * 10))
 
 # %% Collapsible Object Wrapper
 my_data = {
@@ -69,8 +69,8 @@ my_data = {
     "features": ["caching", "streaming", "ipc", "Svelte UI"],
     "nested": {"status": "active", "port": 7777, "socket": ".nb.sock"},
 }
-display(Object(my_data))
-display(MD("**Hello**"))
+display(my_data)
+display("**Hello**", as_="md")
 
 # %% Caching with @nb_cache
 
@@ -79,7 +79,7 @@ WINDOW = 3
 
 @nb_cache(keys=["WINDOW"])
 def expensive_computation(x):
-    display(MD(f"Calculating for x={x} (this should only run on cache miss)..."))
+    display(f"Calculating for x={x} (this should only run on cache miss)...", as_="md")
     time.sleep(1)  # simulate slow task
     return x * WINDOW
 
@@ -100,4 +100,4 @@ fig = px.bar(df, x="x", y="y", title="Sample Bar Chart")
 display(fig)
 
 # %% Display a table
-display(Table(pl.concat([df] * 10)))
+display(pl.concat([df] * 10))

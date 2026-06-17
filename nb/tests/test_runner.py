@@ -49,6 +49,7 @@ display(x)
     assert "cell_end" in event_types
     assert "run_end" in event_types
 
-    assert ("display_record", {"cell_id": 0, "type": "text", "payload": "10"}) in events
+    # A bare non-str object falls back to an "object" record (JSON-serialized).
+    assert ("display_record", {"cell_id": 0, "type": "object", "payload": 10}) in events
     assert events[-1] == ("run_end", {"status": "ok"})
     assert exec_ns.get("x") == 10

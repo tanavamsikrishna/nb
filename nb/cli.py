@@ -60,9 +60,9 @@ def run(notebook: Path) -> None:
         s.close()
 
 
-@main.command("_daemon", hidden=True)
+@main.command("daemon")
 @click.argument("project_dir", type=click.Path(exists=True, file_okay=False, path_type=Path))
-def _daemon(project_dir: Path) -> None:
+def start_daemon(project_dir: Path) -> None:
     daemon.start_daemon(project_dir.resolve())
 
 

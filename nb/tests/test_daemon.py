@@ -1,11 +1,13 @@
-import pytest
 import asyncio
 import json
-import socket
 import shutil
+import socket
 import tempfile
-import aiohttp
 from pathlib import Path
+
+import aiohttp
+import pytest
+
 import nb.daemon as daemon
 
 

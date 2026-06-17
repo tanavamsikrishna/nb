@@ -135,9 +135,6 @@ def run_notebook(path: Path, exec_ns: dict, emit_event: Callable[[str, dict], No
     exec_ns.setdefault("display", fw.display)
     exec_ns.setdefault("nb_cache", fw.nb_cache)
     exec_ns.setdefault("clear_cache", fw.clear_cache)
-    exec_ns.setdefault("MD", fw.MD)
-    exec_ns.setdefault("HTML", fw.HTML)
-    exec_ns.setdefault("Object", fw.Object)
 
     old_emitter = fw._active_emitter
     installed_runner_emitter = old_emitter is None

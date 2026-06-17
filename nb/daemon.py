@@ -97,9 +97,6 @@ async def handle_ipc_client(reader: asyncio.StreamReader, writer: asyncio.Stream
                     "display": fw.display,
                     "nb_cache": fw.nb_cache,
                     "clear_cache": fw.clear_cache,
-                    "MD": fw.MD,
-                    "HTML": fw.HTML,
-                    "Object": fw.Object,
                 }
 
                 # Execute notebook in separate thread so exec doesn't block the main event loop
