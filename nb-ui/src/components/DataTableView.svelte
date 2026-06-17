@@ -241,6 +241,11 @@
     border: 1px solid var(--border-default);
     border-radius: var(--radius-md);
     transition: opacity 0.2s;
+    /* Shrink-wrap the bordered box to the table, but never exceed the
+       container — at which point overflow-x scrolls. The query bar above is a
+       separate full-width element, so it keeps its width. */
+    width: fit-content;
+    max-width: 100%;
   }
 
   .table-scroll.dimmed {
