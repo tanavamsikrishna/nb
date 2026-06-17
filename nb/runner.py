@@ -113,9 +113,9 @@ def run_notebook(
     path: Path,
     exec_ns: dict,
     emit_event: Callable[[str, dict], None],
-    clear_cache_names: list[str] | None = None,
-    clear_cache_all: bool = False,
 ) -> None:
+    # Cache invalidation happens in the daemon before this runs (see handle_ipc_client),
+    # so the cleared-cache report can be sent to the CLI before the notebook executes.
     try:
         with open(path, "r", encoding="utf-8") as f:
             source = f.read()
@@ -134,13 +134,6 @@ def run_notebook(
     # Build and emit cell manifest
     cell_manifest = [{"id": cell.id, "title": cell.title} for cell in cells]
     emit_event("run_start", {"cell_manifest": cell_manifest})
-
-    # Invalidate caches as requested before running any cell, so cached functions
-    # recompute on this run. Operates on the persistent fw._cache (not exec_ns).
-    if clear_cache_all:
-        fw.clear_all_cache()
-    elif clear_cache_names:
-        fw.clear_cache_by_name(clear_cache_names)
 
     # Prepare execution namespace
     exec_ns.setdefault("__name__", "__main__")

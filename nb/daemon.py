@@ -92,6 +92,27 @@ async def handle_ipc_client(reader: asyncio.StreamReader, writer: asyncio.Stream
                 loop.call_soon_threadsafe(emit_event, event_type, event_data)
 
             try:
+                # Invalidate caches up-front, before any cell runs, so cached
+                # functions recompute on this run. Done here (not in run_notebook)
+                # so the cleared-cache count can be reported to the CLI immediately,
+                # rather than only with the end-of-run reply. Safe to mutate
+                # fw._cache directly: run_lock serializes runs.
+                cache_result: dict | None = None
+                if clear_cache_all:
+                    functions = len({e.qualname for e in fw._cache.values()})
+                    fw.clear_all_cache()
+                    cache_result = {"all": True, "functions": functions, "unmatched": []}
+                elif clear_cache_names:
+                    functions, unmatched = fw.clear_cache_by_name(clear_cache_names)
+                    cache_result = {"all": False, "functions": functions, "unmatched": unmatched}
+
+                if cache_result is not None:
+                    writer.write(
+                        json.dumps({"status": "cache", "cache": cache_result}).encode("utf-8")
+                        + b"\n"
+                    )
+                    await writer.drain()
+
                 # Pre-populate execution namespace with framework builtins
                 exec_ns = {
                     "__name__": "__main__",
@@ -107,12 +128,9 @@ async def handle_ipc_client(reader: asyncio.StreamReader, writer: asyncio.Stream
                     notebook_path,
                     exec_ns,
                     thread_safe_emit_event,
-                    clear_cache_names,
-                    clear_cache_all,
                 )
 
-                resp = {"status": "ok"}
-                writer.write(json.dumps(resp).encode("utf-8") + b"\n")
+                writer.write(json.dumps({"status": "ok"}).encode("utf-8") + b"\n")
                 await writer.drain()
             finally:
                 fw._active_emitter = old_emitter

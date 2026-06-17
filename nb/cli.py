@@ -12,6 +12,10 @@ from nb import daemon
 NOTEBOOK_URL = "http://localhost:7777"
 
 
+def _functions(n: int) -> str:
+    return "function" if n == 1 else "functions"
+
+
 @click.group()
 def main() -> None:
     pass
@@ -22,14 +26,19 @@ def main() -> None:
 @click.option(
     "--clear-cache",
     "clear_cache",
-    is_flag=False,
-    flag_value="\x00ALL",
     default=None,
     metavar="NAMES",
     help="Comma-separated function names whose @nb_cache entries to clear before running "
-    "(matches the short name or qualname). Pass with no value to clear the entire cache.",
+    "(matches the short name or qualname).",
 )
-def run(notebook: Path, clear_cache: str | None) -> None:
+@click.option(
+    "--clear-cache-all",
+    "clear_cache_all",
+    is_flag=True,
+    default=False,
+    help="Clear the entire @nb_cache before running.",
+)
+def run(notebook: Path, clear_cache: str | None, clear_cache_all: bool) -> None:
     notebook_path = notebook.resolve()
     project_dir = Path.cwd()
     socket_path = project_dir / ".nb.sock"
@@ -49,34 +58,59 @@ def run(notebook: Path, clear_cache: str | None) -> None:
             sys.exit(1)
 
     # Request notebook run
+    if clear_cache_all and clear_cache is not None:
+        click.echo("Use either --clear-cache or --clear-cache-all, not both.", err=True)
+        sys.exit(1)
+
     req: dict = {"path": str(notebook_path)}
-    if clear_cache == "\x00ALL":
-        if not click.confirm("Clear the entire cache?", default=False):
-            click.echo("Aborted.")
-            sys.exit(0)
+    if clear_cache_all:
         req["clear_cache_all"] = True
     elif clear_cache is not None:
         names = [n.strip() for n in clear_cache.split(",") if n.strip()]
-        if names:
-            req["clear_cache"] = names
-    print(f"Requesting notebook run with params: {req}")
+        if not names:
+            click.echo("--clear-cache needs one or more function names.", err=True)
+            sys.exit(1)
+        req["clear_cache"] = names
+
     try:
         s.sendall(json.dumps(req).encode("utf-8") + b"\n")
-        resp_data = s.recv(4096)
-        if not resp_data:
-            click.echo("Daemon closed connection without response.", err=True)
-            sys.exit(1)
-        resp = json.loads(resp_data.decode("utf-8").strip())
-        if resp.get("status") == "ok":
-            click.echo(f"Notebook execution requested successfully. View output at {NOTEBOOK_URL}")
-        else:
-            click.echo(f"Execution failed: {resp.get('message')}", err=True)
+        # The daemon clears caches up-front and reports it on a "cache" message that
+        # arrives before the run finishes; the run then ends with an "ok"/"error"
+        # message. Read line-delimited messages until a terminal one arrives.
+        reader = s.makefile("r", encoding="utf-8")
+        while True:
+            line = reader.readline()
+            if not line:
+                click.echo("Daemon closed connection without response.", err=True)
+                sys.exit(1)
+            msg = json.loads(line)
+            status = msg.get("status")
+            if status == "cache":
+                _report_cache(msg.get("cache") or {})
+                continue
+            if status == "ok":
+                click.echo(
+                    f"Notebook execution requested successfully. View output at {NOTEBOOK_URL}"
+                )
+                break
+            click.echo(f"Execution failed: {msg.get('message')}", err=True)
             sys.exit(1)
     except Exception as e:
         click.echo(f"Error communicating with daemon: {e}", err=True)
         sys.exit(1)
     finally:
         s.close()
+
+
+def _report_cache(cache: dict) -> None:
+    n = cache.get("functions", 0)
+    if cache.get("all"):
+        click.echo(f"Cleared entire cache ({n} {_functions(n)}).")
+    else:
+        click.echo(f"Cleared {n} cached {_functions(n)}.")
+    unmatched = cache.get("unmatched") or []
+    if unmatched:
+        click.echo(f"Warning: no cached function matched: {', '.join(unmatched)}", err=True)
 
 
 @main.command("daemon")

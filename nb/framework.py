@@ -320,15 +320,33 @@ def clear_all_cache() -> None:
     _cache.clear()
 
 
-def clear_cache_by_name(names: list[str]) -> int:
+def clear_cache_by_name(names: list[str]) -> tuple[int, list[str]]:
     """Drop every cache entry whose function name or qualname is in ``names``.
 
     Matching on either the short ``__name__`` or the full ``__qualname__`` means a
     nested function (qualname ``outer.<locals>.inner``) can be cleared by passing
-    just ``inner``. Returns the number of entries removed.
+    just ``inner``. A short name clears every entry sharing it, across all scopes;
+    pass the qualname to target a single function.
+
+    Returns ``(functions_cleared, unmatched_names)``. ``functions_cleared`` counts
+    distinct qualnames removed — i.e. how many *functions* were cleared, not how
+    many cache entries (a function may have many entries, one per input-set), since
+    that is the unit a notebook author thinks in. ``unmatched_names`` lists the
+    requested names that matched no entry (useful for surfacing typos). Names are
+    de-duplicated while preserving their given order.
     """
-    targets = set(names)
-    to_remove = [k for k, e in _cache.items() if e.name in targets or e.qualname in targets]
+    targets = list(dict.fromkeys(names))
+    target_set = set(targets)
+    matched: set[str] = set()
+    cleared_qualnames: set[str] = set()
+    to_remove: list = []
+    for k, e in _cache.items():
+        hits = target_set.intersection((e.name, e.qualname))
+        if hits:
+            to_remove.append(k)
+            matched |= hits
+            cleared_qualnames.add(e.qualname)
     for k in to_remove:
         _cache.pop(k, None)
-    return len(to_remove)
+    unmatched = [n for n in targets if n not in matched]
+    return len(cleared_qualnames), unmatched

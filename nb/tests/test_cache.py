@@ -155,13 +155,15 @@ def test_clear_cache_by_name() -> None:
     add(2, 3)
     assert len(_cache) == 2
 
-    # Clearing by short name removes only matching entries and reports the count.
-    removed = clear_cache_by_name(["mult"])
-    assert removed == 1
+    # Clearing by short name removes only matching entries and reports how many
+    # distinct functions were cleared.
+    cleared, unmatched = clear_cache_by_name(["mult"])
+    assert cleared == 1
+    assert unmatched == []
     assert len(_cache) == 1
 
-    # A name that matches nothing is a no-op.
-    assert clear_cache_by_name(["does_not_exist"]) == 0
+    # A name that matches nothing is a no-op, and is reported as unmatched.
+    assert clear_cache_by_name(["does_not_exist"]) == (0, ["does_not_exist"])
     assert len(_cache) == 1
 
 
@@ -184,9 +186,9 @@ def test_clear_cache_by_name_nested() -> None:
 
     # The nested function can be cleared by its short name, without calling
     # anything inside outer.
-    assert clear_cache_by_name(["inner"]) == 1
+    assert clear_cache_by_name(["inner"]) == (1, [])
     assert len(_cache) == 1
-    assert clear_cache_by_name([inner_qualname]) == 0  # already gone
+    assert clear_cache_by_name([inner_qualname]) == (0, [inner_qualname])  # already gone
 
     # Repopulate both entries (outer is cached too, so it must be cleared for its
     # body — and thus inner — to re-run).
@@ -195,4 +197,74 @@ def test_clear_cache_by_name_nested() -> None:
     assert len(_cache) == 2
 
     # The nested function can also be cleared by its full qualname.
-    assert clear_cache_by_name([inner_qualname]) == 1
+    assert clear_cache_by_name([inner_qualname]) == (1, [])
+
+
+def test_clear_cache_by_name_short_name_collision() -> None:
+    clear_all_cache()
+
+    # Two distinct cached functions in different scopes sharing the short name
+    # "worker" but doing different things (different source -> different keys).
+    def make_a():
+        @nb_cache
+        def worker(x: int) -> int:
+            return x + 1
+
+        return worker
+
+    def make_b():
+        @nb_cache
+        def worker(x: int) -> int:
+            return x + 2
+
+        return worker
+
+    make_a()(0)
+    make_b()(0)
+    assert len(_cache) == 2
+
+    # The short name clears both — over-clearing is the intended, safe default.
+    assert clear_cache_by_name(["worker"]) == (2, [])
+    assert len(_cache) == 0
+
+
+def test_clear_cache_by_name_dedups_and_reports_partial() -> None:
+    clear_all_cache()
+
+    @nb_cache
+    def kept(x: int) -> int:
+        return x
+
+    @nb_cache
+    def gone(x: int) -> int:
+        return x
+
+    kept(1)
+    gone(1)
+
+    # Duplicate names collapse; the one real miss is reported once.
+    cleared, unmatched = clear_cache_by_name(["gone", "gone", "typo"])
+    assert cleared == 1
+    assert unmatched == ["typo"]
+    assert len(_cache) == 1
+
+
+def test_clear_cache_by_name_counts_functions_not_entries() -> None:
+    clear_all_cache()
+
+    @nb_cache
+    def fetch(x: int) -> int:
+        return x
+
+    # One function, three distinct input-sets -> three cache entries.
+    fetch(1)
+    fetch(2)
+    fetch(3)
+    assert len(_cache) == 3
+
+    # Clearing reports 1 function (the unit the user thinks in), not 3 entries,
+    # even though all three entries are removed.
+    cleared, unmatched = clear_cache_by_name(["fetch"])
+    assert cleared == 1
+    assert unmatched == []
+    assert len(_cache) == 0
