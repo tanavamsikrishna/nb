@@ -108,16 +108,12 @@
   <!-- Cell Outputs -->
   {#if cell.records.length != 0}
     <div class="cell-outputs">
-      {#each cell.records as record, i}
+      {#each cell.records as record}
         <div class="output-item">
           {#if record.type === "md"}
             <Markdown source={record.payload} variant="inline" />
           {:else if record.type === "table"}
-            <DataTable
-              payload={record.payload}
-              cellId={cell.id}
-              recordIndex={i}
-            />
+            <DataTable payload={record.payload} />
           {:else if record.type === "html"}
             <div class="html-output">
               {@html record.payload}
