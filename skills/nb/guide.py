@@ -50,7 +50,7 @@ def get_data(repeat: int) -> pl.DataFrame:
 
 # %% Demo of datatypes that can be shown
 #
-# `display(obj, *, as_=..., floating_point_accuracy=4, label=None)` is overloaded.
+# `display(obj, *, as_=..., label=None)` is overloaded.
 # The keyword-only `as_` selects the render type explicitly; when omitted, the type
 # is auto-detected. `as_` is spelled with a trailing underscore because `as` is a
 # reserved word. Valid values: "md", "html", "text", "table", "object".
@@ -64,9 +64,9 @@ display("<p style='color: green;'>This HTML text is styled directly.</p>", as_="
 # polars table -- a `DataFrame` is auto-detected as a table
 display(get_data(3))
 
-# Table options -- floating_point_accuracy and label are display() kwargs
+# Table options -- label is a display() kwarg
 # (as_="table" is optional here since a DataFrame is auto-detected)
-display(get_data(1), floating_point_accuracy=2, label="My Table")
+display(get_data(1), label="My Table")
 
 # strings -- a `str` is auto-detected as plain text
 display("Hello")

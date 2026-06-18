@@ -27,8 +27,7 @@ def test_table_serialization():
 
 def test_table_options_passed_through():
     df = pl.DataFrame({"x": [10, 20]})
-    record = _create_display_record(df, "table", floating_point_accuracy=2, label="My table")
-    assert record.payload["floating_point_accuracy"] == 2
+    record = _create_display_record(df, "table", label="My table")
     assert record.payload["label"] == "My table"
 
 

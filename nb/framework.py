@@ -38,7 +38,7 @@ def _emit(record: DisplayRecord) -> None:
         _active_emitter(record)
 
 
-def _serialize_table(df: Any, floating_point_accuracy: int = 4, label: str | None = None) -> dict:
+def _serialize_table(df: Any, label: str | None = None) -> dict:
     import base64
     import io
 
@@ -47,7 +47,6 @@ def _serialize_table(df: Any, floating_point_accuracy: int = 4, label: str | Non
     return {
         "data": base64.b64encode(buf.getvalue()).decode(),
         "total_rows": len(df),
-        "floating_point_accuracy": floating_point_accuracy,
         "label": label,
     }
 
@@ -66,7 +65,6 @@ def _create_display_record(
     obj: Any,
     as_: str | None = None,
     *,
-    floating_point_accuracy: int = 4,
     label: str | None = None,
 ) -> DisplayRecord:
     # Explicit type selection via `as_`
@@ -82,7 +80,7 @@ def _create_display_record(
         if as_ == "table":
             return DisplayRecord(
                 type="table",
-                payload=_serialize_table(obj, floating_point_accuracy, label),
+                payload=_serialize_table(obj, label),
             )
         raise ValueError(f"Unknown display type as_={as_!r}")
 
@@ -112,7 +110,7 @@ def _create_display_record(
         if isinstance(obj, pl.DataFrame):
             return DisplayRecord(
                 type="table",
-                payload=_serialize_table(obj, floating_point_accuracy, label),
+                payload=_serialize_table(obj, label),
             )
     except ImportError:
         pass
@@ -136,21 +134,15 @@ def display(
     obj: Any,
     *,
     as_: Literal["table"] = ...,
-    floating_point_accuracy: int = ...,
     label: str | None = ...,
 ) -> None: ...
 def display(
     obj: Any,
     *,
     as_: Literal["md", "html", "text", "object", "table"] | None = None,
-    floating_point_accuracy: int = 4,
     label: str | None = None,
 ) -> None:
-    _emit(
-        _create_display_record(
-            obj, as_, floating_point_accuracy=floating_point_accuracy, label=label
-        )
-    )
+    _emit(_create_display_record(obj, as_, label=label))
 
 
 # Type-dispatch hashing
@@ -262,12 +254,9 @@ def nb_cache(func: F | None = None, *, keys: list[str] | None = None) -> F:
             obj: Any,
             *,
             as_: str | None = None,
-            floating_point_accuracy: int = 4,
             label: str | None = None,
         ) -> None:
-            record = _create_display_record(
-                obj, as_, floating_point_accuracy=floating_point_accuracy, label=label
-            )
+            record = _create_display_record(obj, as_, label=label)
             if _capture_stack:
                 _capture_stack[-1].append(record)
             _emit(record)

@@ -52,8 +52,8 @@ SSE events (`notebook_header`, `run_start`, `cell_start`, `display_record`, `cel
 exec namespace*, discarded afterward. The cache deliberately lives in `nb.framework._cache`,
 not the exec namespace, so it survives between runs.
 
-**Display.** The single entry point is `display(obj, *, as_=None, floating_point_accuracy=4,
-label=None)` in `nb/framework.py`. `as_` is one of `md | html | text | object | table`, or
+**Display.** The single entry point is `display(obj, *, as_=None, label=None)` in
+`nb/framework.py`. `as_` is one of `md | html | text | object | table`, or
 omitted to auto-detect (Plotly figure → `plotly`, Altair chart → `altair`, polars DataFrame →
 `table`, `str` → `text`, else → `object`). Display primitives tag records with the current
 cell via the module globals `_current_cell_id` / `_active_emitter`. Tables are serialized as

@@ -67,6 +67,27 @@
     return typeId === 2 || typeId === 3 || typeId === 7;
   }
 
+  const SIG_FIGS = 5;
+
+  // Round a number (or Int64 BigInt) to SIG_FIGS significant digits for display.
+  // Trailing zeros from the rounding are dropped (via Number()), so e.g.
+  // 123456 -> "123460", 0.123456 -> "0.12346", 1.5 -> "1.5".
+  function toSigFigs(value) {
+    const num = typeof value === "bigint" ? Number(value) : value;
+    if (!Number.isFinite(num)) return String(value);
+    if (num === 0) return "0";
+    return String(Number(num.toPrecision(SIG_FIGS)));
+  }
+
+  // Value shown in the cell: numeric columns are rounded to SIG_FIGS; the full
+  // value is preserved in the cell's title tooltip (see template).
+  function displayValue(value, numeric) {
+    if (numeric && (typeof value === "number" || typeof value === "bigint")) {
+      return toSigFigs(value);
+    }
+    return value;
+  }
+
   function submit() {
     submittedSql = sql;
     execute();
@@ -134,7 +155,7 @@
                 {#if row[col.name] === null}
                   <span class="null-val">—</span>
                 {:else}
-                  {row[col.name]}
+                  {displayValue(row[col.name], col.numeric)}
                 {/if}
               </td>
             {/each}
