@@ -53,3 +53,26 @@ display(x)
     assert ("display_record", {"cell_id": 0, "type": "object", "payload": 10}) in events
     assert events[-1] == ("run_end", {"status": "ok"})
     assert exec_ns.get("x") == 10
+
+
+def test_run_notebook_syntax_error(tmp_path: Path) -> None:
+    # A SyntaxError raises in compile() before timing starts. The error handler
+    # must still report the cell/run as failed rather than blowing up on
+    # unbound wall_ms/cpu_ms (regression test).
+    nb_file = tmp_path / "bad_nb.py"
+    nb_file.write_text("# %%\nx = (\n")  # unterminated — SyntaxError at compile
+
+    events: List[Tuple[str, dict]] = []
+
+    def emit_event(event_type: str, event_data: dict) -> None:
+        events.append((event_type, event_data))
+
+    # Should not raise (previously NameError on wall_ms in the except block).
+    run_notebook(nb_file, {}, emit_event)
+
+    cell_end = next(d for t, d in events if t == "cell_end")
+    assert cell_end["status"] == "error"
+    assert cell_end["wall_ms"] == 0 and cell_end["cpu_ms"] == 0
+    # The traceback is surfaced as a text record, and the run ends in error.
+    assert any(t == "display_record" and d["type"] == "text" for t, d in events)
+    assert events[-1] == ("run_end", {"status": "error"})

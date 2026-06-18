@@ -162,6 +162,10 @@ def run_notebook(
             # Tag the cell so display primitives know which cell they belong to.
             fw._current_cell_id = cell.id
 
+            # Default so the except block has values even if compile() raises
+            # (e.g. a SyntaxError in the cell) before timing starts.
+            wall_ms = 0
+            cpu_ms = 0
             try:
                 compiled = compile(cell.code, str(path), "exec")
 

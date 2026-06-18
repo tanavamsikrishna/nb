@@ -20,8 +20,9 @@ The repo has two sub-projects:
 make install              # == uv sync --extra all --extra dev
 
 # Run the notebook system (two terminals)
-uv run nb daemon .        # start the daemon once per project session (serves :7777)
-uv run nb run example.py  # send a run request to the daemon over the .nb.sock unix socket
+uv run nb daemon .          # start the daemon once per project session (serves :7777)
+uv run nb run example.py    # send a run request to the daemon over the .nb.sock unix socket
+uv run nb run -w example.py # --watch: re-run automatically on every file save (Ctrl-C to stop)
 
 # Python tests (pytest + pytest-asyncio)
 uv run pytest                                   # all tests

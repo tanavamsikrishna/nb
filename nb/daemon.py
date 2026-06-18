@@ -15,11 +15,25 @@ from nb import runner
 active_clients: Set[asyncio.Queue] = set()
 run_lock = asyncio.Lock()
 
+# Buffer of the most recent run's events, replayed to clients that connect (or
+# refresh) after the run. Without it, a freshly-opened browser shows a blank
+# page until the next run, since /stream is otherwise live-only. Reset at the
+# start of each run ("notebook_header" is always the first event runner emits).
+last_run_events: list[dict] = []
+
 
 def emit_event(event_type: str, event_data: dict) -> None:
     event = {"event": event_type, "data": event_data}
+    if event_type == "notebook_header":
+        last_run_events.clear()
+    last_run_events.append(event)
     for queue in list(active_clients):
         queue.put_nowait(event)
+
+
+def _format_sse(event: dict) -> bytes:
+    data_str = json.dumps(event["data"])
+    return f"event: {event['event']}\ndata: {data_str}\n\n".encode("utf-8")
 
 
 async def stream_handler(request: web.Request) -> web.StreamResponse:
@@ -30,15 +44,19 @@ async def stream_handler(request: web.Request) -> web.StreamResponse:
     response.headers["Access-Control-Allow-Origin"] = "*"
     await response.prepare(request)
 
+    # Snapshot the last run and subscribe with no await in between, so the
+    # single-threaded event loop can't slip a live event past us: anything
+    # emitted after this point lands on the queue, never duplicating the
+    # snapshot. (emit_event also runs on this loop thread.)
+    buffered = list(last_run_events)
     queue = asyncio.Queue()
     active_clients.add(queue)
     try:
+        for event in buffered:
+            await response.write(_format_sse(event))
         while True:
             event = await queue.get()
-            event_type = event["event"]
-            data_str = json.dumps(event["data"])
-            msg = f"event: {event_type}\ndata: {data_str}\n\n"
-            await response.write(msg.encode("utf-8"))
+            await response.write(_format_sse(event))
     except asyncio.CancelledError:
         pass
     finally:

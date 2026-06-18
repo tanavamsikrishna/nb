@@ -68,3 +68,27 @@ async def test_daemon_lifecycle(tmp_path: Path) -> None:
             pass
     finally:
         shutil.rmtree(project_dir, ignore_errors=True)
+
+
+@pytest.mark.asyncio
+async def test_stream_replays_last_run() -> None:
+    """A client that connects after a run receives the buffered run events."""
+    daemon.last_run_events.clear()
+
+    # Simulate a completed run's event sequence.
+    daemon.emit_event("notebook_header", {"path": "/tmp/nb.py"})
+    daemon.emit_event("run_start", {"cell_manifest": [{"id": 0, "title": ""}]})
+    daemon.emit_event("run_end", {"status": "ok"})
+
+    # A new run resets the buffer (notebook_header is always first).
+    daemon.emit_event("notebook_header", {"path": "/tmp/other.py"})
+    daemon.emit_event("run_end", {"status": "ok"})
+
+    replayed = [e["event"] for e in daemon.last_run_events]
+    assert replayed == ["notebook_header", "run_end"]
+    assert daemon.last_run_events[0]["data"]["path"] == "/tmp/other.py"
+
+    # Buffered events serialize to valid SSE frames.
+    frame = daemon._format_sse(daemon.last_run_events[0])
+    assert frame.startswith(b"event: notebook_header\ndata: ")
+    assert frame.endswith(b"\n\n")
