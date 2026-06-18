@@ -30,6 +30,24 @@ body {
   color: var(--color-selection-fg);
 }
 
+/* Floating tooltip (use:tooltip action) — mounted on <body>, hence global. */
+.tooltip-floating {
+  position: fixed;
+  z-index: 1000;
+  max-width: 320px;
+  padding: 6px 8px;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  color: var(--fg-secondary);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+  pointer-events: none;
+}
+
 /* Custom Scrollbar — light warm palette */
 ::-webkit-scrollbar {
   width: 10px;

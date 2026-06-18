@@ -24,6 +24,7 @@
     connectionStatus,
   } from "./stores/cells";
   import { connectStream } from "./lib/stream";
+  import { tooltip } from "./lib/tooltip";
   import NotebookHeader from "./components/NotebookHeader.svelte";
   import Cell from "./components/Cell.svelte";
 
@@ -41,9 +42,9 @@
         <span class="logo-separator">/</span>
         <span class="logo-sub">notebook stream</span>
         {#if $notebookPath}
-          <span class="notebook-path" title={$notebookPath}
-            >{$notebookPath}</span
-          >
+          <span class="notebook-path" use:tooltip={$notebookPath}>
+            <span class="notebook-path-text">{'‎' + $notebookPath}</span>
+          </span>
         {/if}
       </div>
 
@@ -174,14 +175,21 @@
     font-weight: 400;
     text-transform: none;
     letter-spacing: normal;
-    max-width: 300px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
     margin-left: 8px;
     padding: 2px 8px;
     background: var(--bg-sunken);
     border-radius: var(--radius-sm);
+  }
+
+  .notebook-path-text {
+    display: block;
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    /* Left-truncate so the filename (end of the path) stays visible. */
+    direction: rtl;
+    text-align: left;
   }
 
   /* Connection status */

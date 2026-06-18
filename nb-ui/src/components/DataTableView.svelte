@@ -17,6 +17,8 @@
   Constraints: conn must be an active AsyncDuckDB connection.
 -->
 <script lang="ts">
+  import { tooltip } from "../lib/tooltip";
+
   const MAX_DISPLAY_ROWS = 25;
 
   const { conn, viewName, totalRows, reload } = $props();
@@ -40,10 +42,17 @@
       totalResultRows = dataResult.numRows;
 
       // Extract columns from Arrow schema
-      columns = dataResult.schema.fields.map((f) => ({
-        name: f.name,
-        numeric: isNumericType(f.type),
-      }));
+      columns = dataResult.schema.fields.map((f) => {
+        const temporal = temporalInfo(f.type);
+        return {
+          name: f.name,
+          numeric: isNumericType(f.type),
+          temporal,
+          // tz-aware timestamps are converted to the browser's local zone, so
+          // label the column once with that zone (rather than per cell).
+          zoneLabel: temporal?.kind === "timestamp" && temporal.local ? LOCAL_TZ : "",
+        };
+      });
 
       // Convert Arrow table to array of row objects (first 25 only)
       const displayRows = Math.min(dataResult.numRows, MAX_DISPLAY_ROWS);
@@ -69,6 +78,58 @@
     return typeId === 2 || typeId === 3 || typeId === 7;
   }
 
+  // Classify temporal columns from the Arrow schema. Returns null for
+  // non-temporal types. Arrow type IDs: Date = 8, Time = 9, Timestamp = 10.
+  // For timestamps, `local` distinguishes tz-aware (a true instant → convert to
+  // the browser zone) from naive (a bare wall-clock → render verbatim, no zone).
+  function temporalInfo(type) {
+    const id = type?.typeId;
+    if (id === 10) return { kind: "timestamp", local: type.timezone != null };
+    if (id === 8) return { kind: "date" };
+    if (id === 9) return { kind: "time", unit: type.unit };
+    return null;
+  }
+
+  // The browser's IANA zone (e.g. "America/Los_Angeles"), shown next to
+  // tz-aware timestamp columns so the displayed local times are unambiguous.
+  const LOCAL_TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+  const num = (v) => (typeof v === "bigint" ? Number(v) : v);
+  const pad = (n, w = 2) => String(n).padStart(w, "0");
+
+  // apache-arrow returns timestamps as ms-since-epoch. For tz-aware columns the
+  // ms is a real instant → use local getters. For naive columns the ms encodes
+  // the wall clock as if UTC → use UTC getters so we don't shift it by the
+  // local offset. Sub-second detail is omitted unless `withFrac` (cells stay to
+  // second resolution; the tooltip shows the full value).
+  function fmtTimestamp(ms, local, withFrac = false) {
+    const d = new Date(num(ms));
+    const [Y, Mo, D, h, m, s, frac] = local
+      ? [d.getFullYear(), d.getMonth() + 1, d.getDate(), d.getHours(), d.getMinutes(), d.getSeconds(), d.getMilliseconds()]
+      : [d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate(), d.getUTCHours(), d.getUTCMinutes(), d.getUTCSeconds(), d.getUTCMilliseconds()];
+    let out = `${Y}-${pad(Mo)}-${pad(D)} ${pad(h)}:${pad(m)}:${pad(s)}`;
+    if (withFrac && frac) out += `.${pad(frac, 3)}`;
+    return out;
+  }
+
+  // Date is a calendar date (ms at UTC midnight) — format date-only via UTC.
+  function fmtDate(ms) {
+    const d = new Date(num(ms));
+    return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+  }
+
+  // Time is a count since midnight in the column's unit (0=s,1=ms,2=us,3=ns).
+  // Sub-second detail is omitted unless `withFrac` (tooltip only).
+  function fmtTime(value, unit, withFrac = false) {
+    const div = [1, 1e3, 1e6, 1e9][unit] ?? 1;
+    const totalSec = num(value) / div;
+    const sInt = Math.floor(totalSec % 60);
+    const frac = totalSec % 1;
+    let out = `${pad(Math.floor(totalSec / 3600))}:${pad(Math.floor((totalSec % 3600) / 60))}:${pad(sInt)}`;
+    if (withFrac && frac > 1e-9) out += `.${pad(Math.round(frac * 1000), 3)}`;
+    return out;
+  }
+
   const SIG_FIGS = 5;
 
   // Round a number (or Int64 BigInt) to SIG_FIGS significant digits for display.
@@ -81,12 +142,40 @@
     return String(Number(num.toPrecision(SIG_FIGS)));
   }
 
-  // Value shown in the cell: numeric columns are rounded to SIG_FIGS; the full
-  // value is preserved in the cell's title tooltip (see template).
-  function displayValue(value, numeric) {
-    if (numeric && (typeof value === "number" || typeof value === "bigint")) {
+  // Value shown in the cell: temporal columns are formatted as date/time
+  // strings; numeric columns are rounded to SIG_FIGS. The full / unambiguous
+  // value is preserved in the hover tooltip (see tooltipValue + template).
+  function displayValue(value, col) {
+    const t = col.temporal;
+    if (t) {
+      if (t.kind === "timestamp") return fmtTimestamp(value, t.local);
+      if (t.kind === "date") return fmtDate(value);
+      if (t.kind === "time") return fmtTime(value, t.unit);
+    }
+    if (col.numeric && (typeof value === "number" || typeof value === "bigint")) {
       return toSigFigs(value);
     }
+    return value;
+  }
+
+  // Hover tooltip value. Cells are shown to second resolution; the tooltip
+  // carries the full sub-second detail (and, for tz-aware timestamps, the
+  // unambiguous UTC instant). Naive timestamps and times only get a tooltip
+  // when they actually have sub-second detail to reveal; dates never do.
+  // Non-temporal columns fall back to the full untruncated/unrounded value.
+  function tooltipValue(value, col) {
+    if (value === null || value === undefined) return null;
+    const t = col.temporal;
+    if (t?.kind === "timestamp") {
+      if (t.local) return `${new Date(num(value)).toISOString()} (UTC)`;
+      const full = fmtTimestamp(value, false, true);
+      return full !== fmtTimestamp(value, false) ? full : null;
+    }
+    if (t?.kind === "time") {
+      const full = fmtTime(value, t.unit, true);
+      return full !== fmtTime(value, t.unit) ? full : null;
+    }
+    if (t) return null; // date: no sub-second detail
     return value;
   }
 
@@ -156,6 +245,7 @@
           {#each columns as col}
             <th class:numeric={col.numeric} title={col.name}>
               <span class="col-name">{col.name}</span>
+              {#if col.zoneLabel}<span class="col-zone">({col.zoneLabel})</span>{/if}
             </th>
           {/each}
         </tr>
@@ -166,12 +256,12 @@
             {#each columns as col}
               <td
                 class:numeric={col.numeric}
-                title={row[col.name] === null ? "" : String(row[col.name])}
+                use:tooltip={tooltipValue(row[col.name], col)}
               >
                 {#if row[col.name] === null}
                   <span class="null-val">—</span>
                 {:else}
-                  {displayValue(row[col.name], col.numeric)}
+                  {displayValue(row[col.name], col)}
                 {/if}
               </td>
             {/each}
@@ -316,6 +406,12 @@
 
   thead th.numeric {
     text-align: right;
+  }
+
+  .col-zone {
+    margin-left: 4px;
+    font-weight: 400;
+    color: var(--fg-secondary);
   }
 
   tbody td {

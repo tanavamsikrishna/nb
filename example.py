@@ -63,6 +63,48 @@ df = pl.DataFrame(
 )
 display(pl.concat([df] * 10))
 
+# %% Date / time types
+
+display("## Date / time types", as_="md")
+# Exercises every temporal type the table view formats:
+#   event_date   -> Date            (date-only)
+#   local_ts     -> Datetime        (naive: rendered verbatim, no zone)
+#   utc_ts       -> Datetime("UTC") (tz-aware: shown in your local zone,
+#                                    header labels the zone, tooltip shows UTC)
+#   time_of_day  -> Time            (clock time, no zone)
+events = pl.DataFrame(
+    {
+        "event": ["login", "purchase", "logout", "refund"],
+        "event_date": [
+            date(2026, 6, 15),
+            date(2026, 6, 16),
+            date(2026, 6, 16),
+            date(2026, 6, 18),
+        ],
+        # Sub-second detail (microseconds) is dropped from the cell display but
+        # surfaced on hover, so a few rows carry fractional seconds.
+        "local_ts": [
+            datetime.datetime(2026, 6, 15, 9, 30, 0, 123000),
+            datetime.datetime(2026, 6, 16, 14, 5, 12),
+            datetime.datetime(2026, 6, 16, 18, 45, 30, 500000),
+            datetime.datetime(2026, 6, 18, 8, 0, 0),
+        ],
+        "utc_ts": [
+            datetime.datetime(2026, 6, 15, 16, 30, 0, 250000, tzinfo=datetime.timezone.utc),
+            datetime.datetime(2026, 6, 16, 21, 5, 12, tzinfo=datetime.timezone.utc),
+            datetime.datetime(2026, 6, 17, 1, 45, 30, tzinfo=datetime.timezone.utc),
+            datetime.datetime(2026, 6, 18, 15, 0, 0, tzinfo=datetime.timezone.utc),
+        ],
+        "time_of_day": [
+            datetime.time(9, 30, 0, 123000),
+            datetime.time(14, 5, 12),
+            datetime.time(18, 45, 30, 750000),
+            datetime.time(8, 0, 0),
+        ],
+    }
+)
+display(events)
+
 # %% Collapsible Object Wrapper
 time.sleep(1)
 my_data = {
