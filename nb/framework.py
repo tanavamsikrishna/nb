@@ -25,10 +25,9 @@ class CacheEntry:
     qualname: str = ""
 
 
-# Cache state location
 _cache: dict[str, CacheEntry] = {}
 
-# Active emitter callback set by daemon
+# Set by the daemon for the duration of a run; display primitives emit through it.
 _active_emitter: Callable[[DisplayRecord], None] | None = None
 _current_cell_id: int | None = None
 
@@ -67,7 +66,6 @@ def _create_display_record(
     *,
     label: str | None = None,
 ) -> DisplayRecord:
-    # Explicit type selection via `as_`
     if as_ is not None:
         if as_ == "md":
             return DisplayRecord(type="md", payload=str(obj))
@@ -84,8 +82,8 @@ def _create_display_record(
             )
         raise ValueError(f"Unknown display type as_={as_!r}")
 
-    # Auto-detect when `as_` is omitted
-    # 1. Plotly
+    # Auto-detect: the optional deps are imported lazily so the framework works
+    # without them installed; a missing one just falls through to the next type.
     try:
         from plotly.basedatatypes import BaseFigure
 
@@ -94,7 +92,6 @@ def _create_display_record(
     except (ImportError, AttributeError):
         pass
 
-    # 2. Altair
     try:
         import altair as alt
 
@@ -103,7 +100,6 @@ def _create_display_record(
     except (ImportError, AttributeError):
         pass
 
-    # 3. Polars DataFrame -> table
     try:
         import polars as pl
 
@@ -115,11 +111,9 @@ def _create_display_record(
     except ImportError:
         pass
 
-    # 4. Plain strings -> text
     if isinstance(obj, str):
         return DisplayRecord(type="text", payload=obj)
 
-    # 5. Fallback: everything else -> object
     return DisplayRecord(type="object", payload=_serialize_object(obj))
 
 
@@ -145,25 +139,20 @@ def display(
     _emit(_create_display_record(obj, as_, label=label))
 
 
-# Type-dispatch hashing
 def _hash_value(obj: Any) -> bytes:
-    # Primitives
     if isinstance(obj, (int, str, float, bool, bytes, type(None))):
         return pickle.dumps(obj)
 
-    # Polars DataFrame
     try:
         import polars as pl
 
         if isinstance(obj, pl.DataFrame):
-            # hash_rows() + schema bytes
             row_hashes = obj.hash_rows().to_numpy().tobytes()
             schema_bytes = str(obj.schema).encode("utf-8")
             return row_hashes + schema_bytes
     except ImportError:
         pass
 
-    # Numpy ndarray
     try:
         import numpy as np
 
@@ -172,7 +161,6 @@ def _hash_value(obj: Any) -> bytes:
     except ImportError:
         pass
 
-    # Pydantic BaseModel
     try:
         from pydantic import BaseModel
 
@@ -184,13 +172,13 @@ def _hash_value(obj: Any) -> bytes:
     except ImportError:
         pass
 
-    # Notebook-defined functions
+    # Only notebook-defined functions are hashable: their source lives in the
+    # notebook, so a change to it should invalidate the cache.
     if isinstance(obj, (types.FunctionType, types.MethodType)):
         if getattr(obj, "__module__", None) == "__main__":
             try:
                 return inspect.getsource(obj).encode("utf-8")
             except Exception:
-                # If we cannot get source, hash the bytecode
                 if hasattr(obj, "__code__"):
                     return pickle.dumps(obj.__code__.co_code)
                 raise TypeError(f"Could not hash notebook-defined function {obj}")
@@ -203,22 +191,18 @@ def _hash_value(obj: Any) -> bytes:
 def compute_key(func: Callable, args: tuple, kwargs: dict, keys: list[str] | None) -> str:
     h = hashlib.blake2b()
 
-    # 1. Source code hash of the function
     try:
         source_code = inspect.getsource(func)
     except Exception:
-        # Fallback to bytecode if getsource fails
         source_code = func.__code__.co_code.hex()
     h.update(source_code.encode("utf-8"))
 
-    # 2. Input hash (args, kwargs sorted by key)
     for arg in args:
         h.update(_hash_value(arg))
     for k in sorted(kwargs.keys()):
         h.update(k.encode("utf-8"))
         h.update(_hash_value(kwargs[k]))
 
-    # 3. Globals hash (when keys is provided)
     if keys is not None:
         for key in keys:
             if key not in func.__globals__:
@@ -245,7 +229,6 @@ def _check_purity(code: types.CodeType, func_name: str) -> None:
 
 def nb_cache(func: F | None = None, *, keys: list[str] | None = None) -> F:
     def decorator(func: F) -> F:
-        # Run purity linter before wrapping
         _check_purity(func.__code__, func.__name__)
 
         _capture_stack: list[list[DisplayRecord]] = []
@@ -270,7 +253,10 @@ def nb_cache(func: F | None = None, *, keys: list[str] | None = None) -> F:
 
         @wraps(func)
         def wrapper(*args, **kwargs):
-            # Sync any new or modified variables from original globals into the captured globals
+            # new_globals is a frozen copy taken at decoration time (with our
+            # capturing display swapped in); refresh it from the live notebook
+            # globals each call so the function sees current values, never
+            # overwriting our display.
             for k, v in func.__globals__.items():
                 if k != "display":
                     new_globals[k] = v

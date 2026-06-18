@@ -12,7 +12,6 @@ from aiohttp import web
 import nb.framework as fw
 from nb import runner
 
-# Global set of active SSE client queues
 active_clients: Set[asyncio.Queue] = set()
 run_lock = asyncio.Lock()
 
@@ -74,17 +73,16 @@ async def handle_ipc_client(reader: asyncio.StreamReader, writer: asyncio.Stream
 
             loop = asyncio.get_running_loop()
 
-            # Callback for capture in display primitives
             def active_emitter(record: fw.DisplayRecord) -> None:
                 event_data = {
                     "cell_id": fw._current_cell_id,
                     "type": record.type,
                     "payload": record.payload,
                 }
-                # Display primitives are executed in thread, call_soon_threadsafe is required
+                # Display primitives run in the executor thread, so hop back to
+                # the event loop thread to touch the client queues.
                 loop.call_soon_threadsafe(emit_event, "display_record", event_data)
 
-            # Store original emitter
             old_emitter = fw._active_emitter
             fw._active_emitter = active_emitter
 
@@ -113,7 +111,6 @@ async def handle_ipc_client(reader: asyncio.StreamReader, writer: asyncio.Stream
                     )
                     await writer.drain()
 
-                # Pre-populate execution namespace with framework builtins
                 exec_ns = {
                     "__name__": "__main__",
                     "__builtins__": __builtins__,
@@ -175,19 +172,15 @@ async def main(project_dir: Path, *, host: str = "0.0.0.0", port: int = 7777) ->
     if socket_path.exists():
         socket_path.unlink()
 
-    # Ensure static directory structure exists
     STATIC_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Initialize aiohttp Application
     app = web.Application()
     app.router.add_get("/stream", stream_handler)
     app.router.add_get("/", index_handler)
     app.router.add_static("/", STATIC_DIR)
 
-    # Start Unix Socket Server
     socket_server = await asyncio.start_unix_server(handle_ipc_client, path=str(socket_path))
 
-    # Start HTTP Server on port 7777
     runner_http = web.AppRunner(app)
     await runner_http.setup()
     site = web.TCPSite(runner_http, host, port)
@@ -199,8 +192,7 @@ async def main(project_dir: Path, *, host: str = "0.0.0.0", port: int = 7777) ->
 
     _task = asyncio.create_task(open_site_in_browser(site_url))
 
-    # Graceful shutdown event — triggered by SIGINT/SIGTERM
-    # First signal: graceful shutdown. Second signal: force exit.
+    # First SIGINT/SIGTERM shuts down gracefully; a second one forces exit.
     shutdown_event = asyncio.Event()
     loop = asyncio.get_running_loop()
     shutting_down = False

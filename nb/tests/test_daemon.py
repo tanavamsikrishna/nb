@@ -61,7 +61,6 @@ async def test_daemon_lifecycle(tmp_path: Path) -> None:
     await writer.wait_closed()
 
     try:
-        # Stop the daemon task
         task.cancel()
         try:
             await task

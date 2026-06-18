@@ -49,7 +49,8 @@ def run(notebook: Path, clear_cache: str | None, clear_cache_all: bool) -> None:
         try:
             s.connect(str(socket_path))
         except (socket.error, ConnectionRefusedError):
-            # Clean up stale socket file
+            # Socket file exists but nothing is listening — a leftover from a
+            # daemon that died; remove it so the next start can rebind.
             try:
                 socket_path.unlink()
             except Exception:
@@ -57,7 +58,6 @@ def run(notebook: Path, clear_cache: str | None, clear_cache_all: bool) -> None:
             click.echo("Could not connect to daemon. Is it running?", err=True)
             sys.exit(1)
 
-    # Request notebook run
     if clear_cache_all and clear_cache is not None:
         click.echo("Use either --clear-cache or --clear-cache-all, not both.", err=True)
         sys.exit(1)
@@ -131,7 +131,6 @@ def build_ui() -> None:
 
     click.echo("Building Svelte UI...")
 
-    # Run pnpm install if node_modules doesn't exist
     node_modules = ui_dir / "node_modules"
     if not node_modules.exists():
         click.echo("Running pnpm install...")

@@ -17,13 +17,11 @@ from nb.framework import (
 
 
 def test_purity_linter() -> None:
-    # Pure function should pass
     def pure_func(x: int) -> int:
         return x + 1
 
     _check_purity(pure_func.__code__, "pure_func")
 
-    # Impure function (mutates global) should raise SyntaxError
     def impure_func(x: int) -> None:
         global G
         G = x
@@ -33,26 +31,22 @@ def test_purity_linter() -> None:
 
 
 def test_hash_value() -> None:
-    # Primitives
     assert _hash_value(1) == _hash_value(1)
     assert _hash_value("test") != _hash_value("test2")
     assert _hash_value(None) == _hash_value(None)
 
-    # Numpy array
     arr1 = np.array([1, 2, 3])
     arr2 = np.array([1, 2, 3])
     arr3 = np.array([1, 2, 4])
     assert _hash_value(arr1) == _hash_value(arr2)
     assert _hash_value(arr1) != _hash_value(arr3)
 
-    # Polars DataFrame
     df1 = pl.DataFrame({"a": [1, 2]})
     df2 = pl.DataFrame({"a": [1, 2]})
     df3 = pl.DataFrame({"a": [1, 3]})
     assert _hash_value(df1) == _hash_value(df2)
     assert _hash_value(df1) != _hash_value(df3)
 
-    # Pydantic BaseModel
     class Model(BaseModel):
         val: int
 

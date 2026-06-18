@@ -102,7 +102,7 @@ def parse_notebook(source: str) -> Tuple[str | None, List[Cell]]:
             )
         )
 
-    # Re-index all cells consecutively starting at 0
+    # Skipping a docstring-only cell 0 leaves a gap, so renumber consecutively.
     for idx, cell in enumerate(cells):
         cell.id = idx
 
@@ -125,17 +125,15 @@ def run_notebook(
 
     docstring, cells = parse_notebook(source)
 
-    # Emit notebook header (always emit so frontend receives the path)
+    # Always emit, even without a docstring, so the frontend receives the path.
     header_data: dict = {"path": str(path)}
     if docstring is not None:
         header_data["docstring"] = docstring
     emit_event("notebook_header", header_data)
 
-    # Build and emit cell manifest
     cell_manifest = [{"id": cell.id, "title": cell.title} for cell in cells]
     emit_event("run_start", {"cell_manifest": cell_manifest})
 
-    # Prepare execution namespace
     exec_ns.setdefault("__name__", "__main__")
     exec_ns.setdefault("__builtins__", __builtins__)
     exec_ns.setdefault("display", fw.display)
@@ -161,13 +159,12 @@ def run_notebook(
                 {"cell_id": cell.id, "source_line": cell.source_line, "title": cell.title},
             )
 
-            # Set active cell ID in framework so that display primitives can tag themselves
+            # Tag the cell so display primitives know which cell they belong to.
             fw._current_cell_id = cell.id
 
             try:
                 compiled = compile(cell.code, str(path), "exec")
 
-                # Wrap the whole cell in timing
                 wall_start = time.perf_counter()
                 cpu_start = time.process_time()
                 try:
@@ -181,7 +178,6 @@ def run_notebook(
                     {"cell_id": cell.id, "wall_ms": wall_ms, "cpu_ms": cpu_ms, "status": "ok"},
                 )
             except Exception:
-                # Format and emit traceback as plain text
                 tb = traceback.format_exc()
                 emit_event("display_record", {"cell_id": cell.id, "type": "text", "payload": tb})
 
