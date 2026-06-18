@@ -43,9 +43,14 @@ export function connectStream() {
       if (cell) {
         cell.status = "running";
         cell.stale = false;
-        cell.records = [];
         cell.profiling = null;
         cell.title = title;
+        // Keep existing records mounted; overwrite them in place as new
+        // display_record events arrive (tracked by _cursor). Leftover records
+        // beyond the cursor are truncated at cell_end. This avoids tearing
+        // down and rebuilding output components (and the DataTable DuckDB
+        // re-init flash) on every run.
+        cell._cursor = 0;
       }
       return cs;
     });
@@ -56,7 +61,11 @@ export function connectStream() {
     cells.update((cs) => {
       const cell = cs.find((c) => c.id === cell_id);
       if (cell) {
-        cell.records = [...cell.records, { type, payload }];
+        const cursor = cell._cursor ?? cell.records.length;
+        const records = cell.records.slice();
+        records[cursor] = { type, payload };
+        cell.records = records;
+        cell._cursor = cursor + 1;
       }
       return cs;
     });
@@ -69,6 +78,12 @@ export function connectStream() {
       if (cell) {
         cell.status = status;
         cell.profiling = { wall_ms, cpu_ms };
+        // Drop any records left over from a previous run that this run did
+        // not re-emit (outputs that no longer exist).
+        const cursor = cell._cursor ?? 0;
+        if (cell.records.length > cursor) {
+          cell.records = cell.records.slice(0, cursor);
+        }
       }
       return cs;
     });

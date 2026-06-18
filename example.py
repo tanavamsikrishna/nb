@@ -27,6 +27,7 @@ def func():
 """
 
 # %% Imports
+import datetime
 import time
 from datetime import date
 
@@ -63,6 +64,7 @@ df = pl.DataFrame(
 display(pl.concat([df] * 10))
 
 # %% Collapsible Object Wrapper
+time.sleep(1)
 my_data = {
     "project": "nb",
     "version": "0.1.0",
@@ -70,7 +72,8 @@ my_data = {
     "nested": {"status": "active", "port": 7777, "socket": ".nb.sock"},
 }
 display(my_data)
-display("**Hello**", as_="md")
+time.sleep(1)
+display(f"**Hello at {datetime.datetime.now()}**", as_="md")
 
 # %% Caching with @nb_cache
 

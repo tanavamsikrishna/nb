@@ -8,6 +8,8 @@
     conn       AsyncDuckDB.Connection  — active DuckDB connection
     viewName   string  — name of the registered view (e.g. "t_2_0")
     totalRows  number  — total rows in the original DataFrame
+    reload     number  — bumped by the parent when the view's buffer is swapped
+                         (re-run); re-executes the current query in place
 
   Dependencies: None (receives conn from parent)
   Exports: None (render-only component)
@@ -17,7 +19,7 @@
 <script lang="ts">
   const MAX_DISPLAY_ROWS = 25;
 
-  const { conn, viewName, totalRows } = $props();
+  const { conn, viewName, totalRows, reload } = $props();
 
   const defaultSql = `SELECT * FROM ${viewName} `;
   let sql = $state(defaultSql);
@@ -108,6 +110,20 @@
 
   // Initial execution
   execute();
+
+  // Re-execute the current query when the parent swaps the view's buffer on a
+  // re-run. The view name is stable, so `submittedSql` stays valid; this just
+  // re-runs it against the new data in place (no remount). Skip the effect's
+  // first invocation — the initial run is handled by execute() above.
+  let primed = false;
+  $effect(() => {
+    reload; // track
+    if (!primed) {
+      primed = true;
+      return;
+    }
+    execute();
+  });
 </script>
 
 <div class="table-wrapper">

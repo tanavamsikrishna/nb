@@ -27,49 +27,79 @@
   // Svelte 5 props
   let { cell } = $props();
 
-  // Svelte actions for third party rendering
+  // Svelte actions for third party rendering. Outputs are no longer remounted
+  // on re-run (records are updated in place), so each action must re-render
+  // when its payload changes via the `update` callback rather than only on
+  // mount.
   function plotlyAction(node, payload) {
     let active = true;
-    loadPlotly()
-      .then((Plotly) => {
-        if (active) {
-          // Default to a usable height; without one Plotly falls back to the
-          // container's height  and collapses. The figure's own layout.height still wins if it sets one.
-          const layout = { autosize: true, height: 450, ...payload.layout };
-          const config = { responsive: true, ...(payload.config || {}) };
-          Plotly.newPlot(node, payload.data, layout, config);
-        }
-      })
-      .catch((err) => {
-        if (active) {
-          node.innerHTML = `<span class="error-msg">Failed to render Plotly: ${err.message || err}</span>`;
-        }
-      });
-
+    function render(p) {
+      loadPlotly()
+        .then((Plotly) => {
+          if (active) {
+            // Default to a usable height; without one Plotly falls back to the
+            // container's height  and collapses. The figure's own layout.height still wins if it sets one.
+            const layout = { autosize: true, height: 450, ...p.layout };
+            const config = { responsive: true, ...(p.config || {}) };
+            // Plotly.react diffs against the current figure and updates in
+            // place (no flash); it also handles the initial render.
+            Plotly.react(node, p.data, layout, config);
+          }
+        })
+        .catch((err) => {
+          if (active) {
+            node.innerHTML = `<span class="error-msg">Failed to render Plotly: ${err.message || err}</span>`;
+          }
+        });
+    }
+    render(payload);
     return {
+      update(p) {
+        render(p);
+      },
       destroy() {
         active = false;
+        loadPlotly()
+          .then((Plotly) => Plotly.purge(node))
+          .catch(() => {});
       },
     };
   }
 
   function altairAction(node, payload) {
     let active = true;
-    loadVega()
-      .then((vegaEmbed) => {
-        if (active) {
-          vegaEmbed(node, payload, { actions: false });
-        }
-      })
-      .catch((err) => {
-        if (active) {
-          node.innerHTML = `<span class="error-msg">Failed to render Altair: ${err.message || err}</span>`;
-        }
-      });
-
+    let view = null;
+    function render(spec) {
+      loadVega()
+        .then((vegaEmbed) => {
+          if (!active) return;
+          if (view) {
+            view.finalize?.();
+            node.innerHTML = "";
+          }
+          vegaEmbed(node, spec, { actions: false })
+            .then((res) => {
+              if (active) view = res;
+              else res.finalize?.();
+            })
+            .catch((err) => {
+              node.innerHTML = `<span class="error-msg">Failed to render Altair: ${err.message || err}</span>`;
+            });
+        })
+        .catch((err) => {
+          if (active) {
+            node.innerHTML = `<span class="error-msg">Failed to render Altair: ${err.message || err}</span>`;
+          }
+        });
+    }
+    render(payload);
     return {
+      update(spec) {
+        render(spec);
+      },
       destroy() {
         active = false;
+        view?.finalize?.();
       },
     };
   }
