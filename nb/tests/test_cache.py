@@ -8,6 +8,7 @@ from nb.framework import (
     DisplayRecord,
     _cache,
     _check_purity,
+    _code_fingerprint,
     _hash_value,
     clear_all_cache,
     clear_cache_by_name,
@@ -55,6 +56,61 @@ def test_hash_value() -> None:
     m3 = Model(val=11)
     assert _hash_value(m1) == _hash_value(m2)
     assert _hash_value(m1) != _hash_value(m3)
+
+
+def _compile_func(src: str):
+    # Compile a top-level `def f(...)` from source and return the function. Using a
+    # fixed name `f` lets us compare two source variants without co_name differences.
+    ns: dict = {}
+    exec(compile(src, "<test>", "exec"), ns)
+    return ns["f"]
+
+
+def test_code_fingerprint() -> None:
+    fp = lambda src: _code_fingerprint(_compile_func(src).__code__)
+
+    # Line position is irrelevant: padding the function down the file must not change it.
+    assert fp("def f():\n    return 1\n") == fp("\n\n\ndef f():\n    return 1\n")
+
+    # Comments and whitespace-only reformatting are invisible to the code object.
+    assert fp("def f(x):\n    # a comment\n    return x + 1\n") == fp(
+        "def f(x):\n    return  x+1\n"
+    )
+
+    # Constants are part of the key (this is the bug the old co_code-only fallback had).
+    assert fp("def f():\n    return 1\n") != fp("def f():\n    return 2\n")
+
+    # Symbol names matter.
+    assert fp("def f(a):\n    return a\n") != fp("def f(b):\n    return b\n")
+
+    # Docstrings are intentionally included, so editing one invalidates.
+    assert fp('def f():\n    "doc one"\n    return 1\n') != fp(
+        'def f():\n    "doc two"\n    return 1\n'
+    )
+
+    # Nested string-bodied lambdas must not be mistaken for docstrings and dropped.
+    assert fp('def f():\n    return (lambda: "foo")\n') != fp(
+        'def f():\n    return (lambda: "bar")\n'
+    )
+
+
+def test_hash_value_functions_are_line_independent() -> None:
+    # Notebook-defined functions are hashed via their code fingerprint. A bare lambda
+    # whose body is a string is the tricky case: its return value lives in co_consts[0],
+    # so the two must hash differently.
+    foo = lambda: "foo"
+    bar = lambda: "bar"
+    foo.__module__ = "__main__"
+    bar.__module__ = "__main__"
+    assert _hash_value(foo) != _hash_value(bar)
+
+    # Functions outside __main__ remain unhashable.
+    def helper() -> int:
+        return 1
+
+    helper.__module__ = "somewhere.else"
+    with pytest.raises(TypeError):
+        _hash_value(helper)
 
 
 def test_nb_cache_decorator() -> None:

@@ -1,4 +1,5 @@
 import ast
+import linecache
 import time
 import traceback
 from dataclasses import dataclass
@@ -134,6 +135,19 @@ def run_notebook(
         emit_event("run_end", {"status": "error", "error": f"Failed to read file: {e}"})
         return
 
+    # Inject the exact source we're about to run into linecache, keyed by path.
+    # Cells are compiled with file-relative line numbers (see padding below), so
+    # tracebacks resolve source text from here instead of re-reading from disk.
+    # mtime=None makes the entry permanent (linecache.checkcache skips it), so the
+    # displayed source stays byte-identical to what ran even after the file changes
+    # on disk between runs (e.g. under `nb run -w`).
+    linecache.cache[str(path)] = (
+        len(source),
+        None,
+        source.splitlines(keepends=True),
+        str(path),
+    )
+
     docstring, cells = parse_notebook(source)
 
     # Always emit, even without a docstring, so the frontend receives the path.
@@ -178,7 +192,10 @@ def run_notebook(
             wall_ms = 0
             cpu_ms = 0
             try:
-                compiled = compile(cell.code, str(path), "exec")
+                # Prepend blank lines so the cell's code occupies its true file
+                # line range; tracebacks then report file-relative line numbers.
+                padded = "\n" * (cell.source_line - 1) + cell.code
+                compiled = compile(padded, str(path), "exec")
 
                 wall_start = time.perf_counter()
                 cpu_start = time.process_time()
@@ -192,8 +209,14 @@ def run_notebook(
                     "cell_end",
                     {"cell_id": cell.id, "wall_ms": wall_ms, "cpu_ms": cpu_ms, "status": "ok"},
                 )
-            except Exception:
-                tb = traceback.format_exc()
+            except Exception as exc:
+                # Drop the runner's own leading frame(s) (the `exec(compiled, ...)`
+                # call, or the `compile` call for a SyntaxError) so the traceback
+                # shows only the user's notebook stack.
+                exc_tb = exc.__traceback__
+                while exc_tb is not None and exc_tb.tb_frame.f_code.co_filename == __file__:
+                    exc_tb = exc_tb.tb_next
+                tb = "".join(traceback.format_exception(type(exc), exc, exc_tb))
                 emit_event("display_record", {"cell_id": cell.id, "type": "text", "payload": tb})
 
                 emit_event(

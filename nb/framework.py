@@ -1,6 +1,5 @@
 import dis
 import hashlib
-import inspect
 import json
 import pickle
 import types
@@ -139,6 +138,41 @@ def display(
     _emit(_create_display_record(obj, as_, label=label))
 
 
+def _code_fingerprint(code: types.CodeType) -> bytes:
+    # A line-number-independent fingerprint of a code object's logic. We hash the
+    # opcodes, signature shape, symbol names, and constants (recursing into nested
+    # code objects for closures/lambdas/comprehensions), while deliberately
+    # excluding positional metadata (co_firstlineno, co_filename, co_linetable).
+    # Comments never reach the code object so they are ignored for free; docstrings
+    # live in co_consts and are intentionally kept (changing one invalidates the
+    # cache) to avoid special-casing that would mis-handle string-bodied lambdas.
+    h = hashlib.blake2b()
+    h.update(code.co_code)
+    h.update(
+        pickle.dumps(
+            (
+                code.co_name,
+                code.co_argcount,
+                code.co_posonlyargcount,
+                code.co_kwonlyargcount,
+                code.co_flags,
+                code.co_names,
+                code.co_varnames,
+                code.co_freevars,
+                code.co_cellvars,
+            )
+        )
+    )
+    for const in code.co_consts:
+        if isinstance(const, types.CodeType):
+            h.update(b"\x00CODE")
+            h.update(_code_fingerprint(const))
+        else:
+            h.update(b"\x00CONST")
+            h.update(pickle.dumps(const))
+    return h.digest()
+
+
 def _hash_value(obj: Any) -> bytes:
     if isinstance(obj, (int, str, float, bool, bytes, type(None))):
         return pickle.dumps(obj)
@@ -172,16 +206,11 @@ def _hash_value(obj: Any) -> bytes:
     except ImportError:
         pass
 
-    # Only notebook-defined functions are hashable: their source lives in the
+    # Only notebook-defined functions are hashable: their logic lives in the
     # notebook, so a change to it should invalidate the cache.
     if isinstance(obj, (types.FunctionType, types.MethodType)):
         if getattr(obj, "__module__", None) == "__main__":
-            try:
-                return inspect.getsource(obj).encode("utf-8")
-            except Exception:
-                if hasattr(obj, "__code__"):
-                    return pickle.dumps(obj.__code__.co_code)
-                raise TypeError(f"Could not hash notebook-defined function {obj}")
+            return _code_fingerprint(obj.__code__)
         else:
             raise TypeError(f"Functions defined outside __main__ are not hashable: {obj}")
 
@@ -191,11 +220,7 @@ def _hash_value(obj: Any) -> bytes:
 def compute_key(func: Callable, args: tuple, kwargs: dict, keys: list[str] | None) -> str:
     h = hashlib.blake2b()
 
-    try:
-        source_code = inspect.getsource(func)
-    except Exception:
-        source_code = func.__code__.co_code.hex()
-    h.update(source_code.encode("utf-8"))
+    h.update(_code_fingerprint(func.__code__))
 
     for arg in args:
         h.update(_hash_value(arg))

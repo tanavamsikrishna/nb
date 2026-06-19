@@ -29,6 +29,7 @@ def func():
 # %% Imports
 import datetime
 import time
+import warnings
 from datetime import date
 
 import plotly.express as px
@@ -65,7 +66,10 @@ display(pl.concat([df] * 10))
 
 # %% Date / time types
 
-display("## Date / time types", as_="md")
+
+warnings.warn("About to call an non-existent function")
+
+displayx("## Date / time types", as_="md")
 # Exercises every temporal type the table view formats:
 #   event_date   -> Date            (date-only)
 #   local_ts     -> Datetime        (naive: rendered verbatim, no zone)

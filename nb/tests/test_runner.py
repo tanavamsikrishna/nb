@@ -107,3 +107,41 @@ def test_run_notebook_syntax_error(tmp_path: Path) -> None:
     # The traceback is surfaced as a text record, and the run ends in error.
     assert any(t == "display_record" and d["type"] == "text" for t, d in events)
     assert events[-1] == ("run_end", {"status": "error"})
+
+
+def test_traceback_uses_file_relative_line_numbers(tmp_path: Path) -> None:
+    # A header + a non-first cell so the raising statement's file line differs from
+    # its cell-relative line. `1 / 0` sits on file line 9 but is the 2nd line of its
+    # cell (cell-relative line 2); the traceback must report the file line.
+    nb_file = tmp_path / "err_nb.py"
+    nb_file.write_text(
+        '"""\n'  # line 1
+        "Header docstring\n"  # line 2
+        '"""\n'  # line 3
+        "# %% first\n"  # line 4
+        "x = 1\n"  # line 5
+        "\n"  # line 6
+        "# %% second\n"  # line 7
+        "y = 2\n"  # line 8
+        "1 / 0\n"  # line 9  <- raises here
+    )
+
+    events: List[Tuple[str, dict]] = []
+
+    def emit_event(event_type: str, event_data: dict) -> None:
+        events.append((event_type, event_data))
+
+    run_notebook(nb_file, {}, emit_event)
+
+    tb = next(d["payload"] for t, d in events if t == "display_record" and d["type"] == "text")
+    assert "ZeroDivisionError" in tb
+    # The notebook frame reports the file-relative line (9), not the cell-relative
+    # line (2). Match the notebook file's frame specifically so we don't pick up
+    # unrelated "line N" text from the runner's own frames.
+    assert f'"{nb_file}", line 9' in tb
+    assert f'"{nb_file}", line 2' not in tb
+    # The injected linecache makes the offending source line render correctly too.
+    assert "1 / 0" in tb
+    # The runner's own exec/compile frames are stripped; only notebook frames show.
+    assert "runner.py" not in tb
+    assert events[-1] == ("run_end", {"status": "error"})
