@@ -1,7 +1,5 @@
 import json
-import shutil
 import socket
-import subprocess
 import sys
 import time
 from pathlib import Path
@@ -174,40 +172,6 @@ def _report_cache(cache: dict) -> None:
 @click.argument("project_dir", type=click.Path(exists=True, file_okay=False, path_type=Path))
 def start_daemon(project_dir: Path) -> None:
     daemon.start_daemon(project_dir.resolve())
-
-
-@main.command()
-def build_ui() -> None:
-    repo_dir = Path(__file__).parent.parent.resolve()
-    ui_dir = repo_dir / "nb-ui"
-    static_dir = repo_dir / "nb" / "static"
-
-    if not ui_dir.exists():
-        click.echo(f"Frontend directory not found at {ui_dir}", err=True)
-        sys.exit(1)
-
-    click.echo("Building Svelte UI...")
-
-    node_modules = ui_dir / "node_modules"
-    if not node_modules.exists():
-        click.echo("Running pnpm install...")
-        res = subprocess.run(["pnpm", "install"], cwd=str(ui_dir))
-        if res.returncode != 0:
-            click.echo("pnpm install failed", err=True)
-            sys.exit(1)
-
-    res = subprocess.run(["pnpm", "build"], cwd=str(ui_dir))
-    if res.returncode != 0:
-        click.echo("pnpm build failed", err=True)
-        sys.exit(1)
-
-    click.echo(f"Copying build artifacts to {static_dir}...")
-    dist_dir = ui_dir / "dist"
-    if static_dir.exists():
-        shutil.rmtree(static_dir)
-    static_dir.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(dist_dir, static_dir, dirs_exist_ok=True)
-    click.echo("Build complete!")
 
 
 if __name__ == "__main__":

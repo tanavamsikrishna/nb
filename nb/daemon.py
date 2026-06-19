@@ -71,7 +71,7 @@ async def index_handler(request: web.Request) -> web.FileResponse | web.Response
     index_file = STATIC_DIR / "index.html"
     if not index_file.exists():
         return web.Response(
-            text="UI build not found. Please run `nb build-ui` first to compile and install the frontend.",
+            text="UI build not found. Please run `make build` first to compile and install the frontend.",
             status=404,
         )
     return web.FileResponse(index_file)

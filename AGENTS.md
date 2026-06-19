@@ -33,11 +33,11 @@ uv run pytest nb/tests/test_cache.py::test_name # one test
 cd nb-ui && pnpm dev          # vite dev server; proxies /stream -> :7777 (daemon must run)
 cd nb-ui && pnpm build        # production build -> nb-ui/dist
 cd nb-ui && pnpm format       # prettier
-make build                    # == uv run nb build-ui: pnpm build + copy dist -> nb/static/
+make build                    # pnpm build + copy dist -> nb/static/
 ```
 
 `nb/static/` and `nb-ui/dist/` are gitignored build artifacts. The daemon serves the prebuilt
-UI from `nb/static/`; if it's missing, `nb build-ui` must be run first.
+UI from `nb/static/`; if it's missing, `make build` must be run first.
 
 ## Architecture
 
