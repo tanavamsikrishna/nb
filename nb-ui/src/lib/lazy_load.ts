@@ -33,7 +33,6 @@ export function loadVega() {
       return;
     }
 
-    // Load vega, vega-lite, then vega-embed sequentially
     const s1 = document.createElement("script");
     s1.src = "https://cdn.jsdelivr.net/npm/vega@5";
     s1.onload = () => {

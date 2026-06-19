@@ -128,7 +128,6 @@ def run(notebook: Path, clear_cache: str | None, clear_cache_all: bool, watch: b
             sys.exit(1)
         req["clear_cache"] = names
 
-    # Initial run.
     try:
         ok = _send_run(socket_path, req)
     except _DaemonUnavailable:

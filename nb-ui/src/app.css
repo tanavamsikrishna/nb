@@ -1,13 +1,7 @@
 /*
  * app.css — Global base styles and scrollbar theming for nb-notebook.
- *
- * Sets body defaults, resets, and custom scrollbar colors.
- * Relies on tokens defined in theme.css (imported before this file in main.js).
- *
- * Dependencies: theme.css (imported first in main.js).
- * Exports: None (global CSS).
- * Side-effects: Applies global box-sizing reset and scrollbar styles.
- * Constraints: None.
+ * Body defaults, resets, and custom scrollbar colors. Relies on tokens from
+ * theme.css, which must be imported before this file in main.js.
  */
 
 * {

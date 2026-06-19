@@ -86,7 +86,7 @@ async def handle_ipc_client(reader: asyncio.StreamReader, writer: asyncio.Stream
 
             req = json.loads(line.decode("utf-8"))
             notebook_path = Path(req["path"])
-            clear_cache_names = req.get("clear_cache")  # list[str] | None
+            clear_cache_names = req.get("clear_cache")
             clear_cache_all = req.get("clear_cache_all", False)
 
             loop = asyncio.get_running_loop()

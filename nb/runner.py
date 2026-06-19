@@ -100,7 +100,6 @@ def _is_empty_or_only_docstring(code: str) -> bool:
 
 
 def parse_notebook(source: str) -> Tuple[str | None, List[Cell]]:
-    # Extract module-level docstring
     try:
         parsed_ast = ast.parse(source)
         docstring = ast.get_docstring(parsed_ast)
@@ -135,7 +134,6 @@ def parse_notebook(source: str) -> Tuple[str | None, List[Cell]]:
         else:
             current_cell_lines.append(line)
 
-    # Append the last cell
     code = "".join(current_cell_lines)
     if cell_id == 0 and _is_empty_or_only_docstring(code):
         pass
@@ -143,7 +141,6 @@ def parse_notebook(source: str) -> Tuple[str | None, List[Cell]]:
         cells.append(_make_cell(cell_id, current_label, current_source_line, code))
         cell_id += 1
 
-    # Fallback to single empty cell if empty
     if not cells:
         cells.append(
             Cell(

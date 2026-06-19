@@ -1,13 +1,7 @@
 /**
- * DuckDB-WASM initialization singleton.
- *
- * Provides a single, shared AsyncDuckDB instance for the browser session.
- * Call `getDb()` anywhere — it returns the same stable promise every time.
- *
- * Dependencies: @duckdb/duckdb-wasm
- * Exports: getDb()
- * Side-effects: Spawns a Web Worker on first call.
- * Constraints: Must be excluded from Vite pre-bundling (see vite.config.js).
+ * DuckDB-WASM singleton: one shared AsyncDuckDB instance per browser session.
+ * `getDb()` returns the same stable promise every call (and spawns the worker
+ * on first call). Must be excluded from Vite pre-bundling (see vite.config.js).
  */
 import * as duckdb from "@duckdb/duckdb-wasm";
 import mvp_wasm from "@duckdb/duckdb-wasm/dist/duckdb-mvp.wasm?url";
@@ -22,11 +16,6 @@ const BUNDLES = {
 
 let _promise = null;
 
-/**
- * Returns a promise that resolves to the shared AsyncDuckDB instance.
- * Safe and cheap to call multiple times.
- * @returns {Promise<duckdb.AsyncDuckDB>}
- */
 export function getDb() {
   if (!_promise) _promise = _init();
   return _promise;

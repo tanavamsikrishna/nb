@@ -1,13 +1,8 @@
 /*
  * theme.css — Global design tokens for the nb-notebook light theme.
- *
- * Provides CSS custom properties for typography, colors, shadows, spacing,
- * and radii used across all components. Import once in main.js.
- *
- * Dependencies: Google Fonts (Outfit, JetBrains Mono) loaded via @import below.
- * Exports: None (CSS-only).
- * Side-effects: Defines :root custom properties globally; loads web fonts.
- * Constraints: No runtime theme switching — static light palette.
+ * CSS custom properties (typography, colors, shadows, spacing, radii) for all
+ * components; import once in main.js. Static light palette, no runtime switching.
+ * Web fonts load via the @import below.
  */
 @import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Outfit:wght@100..900&display=swap");
 
