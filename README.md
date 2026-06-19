@@ -4,6 +4,8 @@ A lightweight Python notebook runner. Notebooks are plain `.py` files with `# %%
 cell delimiters — no JSON, no hidden state, fully diffable and git-friendly. A persistent
 daemon executes them cell-by-cell and streams output to a live web UI.
 
+![nb live notebook UI](docs/screenshot.png)
+
 ```python
 # %% Imports
 import polars as pl
