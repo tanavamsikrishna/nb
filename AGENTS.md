@@ -77,7 +77,3 @@ removing absent ones after `run_end`) so scroll position is preserved across run
 
 When writing or editing `.py` notebooks, the canonical, up-to-date API reference is
 `skills/nb/guide.py` (annotated) and `skills/nb/skill.md`. `example.py` is a working sample.
-
-> Note: the `spec/` directory documents an earlier design and has drifted from the
-> implementation (e.g. it lists separate `display_md`/`embed_plotly` primitives that no longer
-> exist). Trust the code, `skills/nb/guide.py`, and `example.py` over `spec/`.

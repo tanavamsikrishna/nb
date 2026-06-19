@@ -50,7 +50,8 @@
           temporal,
           // tz-aware timestamps are converted to the browser's local zone, so
           // label the column once with that zone (rather than per cell).
-          zoneLabel: temporal?.kind === "timestamp" && temporal.local ? LOCAL_TZ : "",
+          zoneLabel:
+            temporal?.kind === "timestamp" && temporal.local ? LOCAL_TZ : "",
         };
       });
 
@@ -105,8 +106,24 @@
   function fmtTimestamp(ms, local, withFrac = false) {
     const d = new Date(num(ms));
     const [Y, Mo, D, h, m, s, frac] = local
-      ? [d.getFullYear(), d.getMonth() + 1, d.getDate(), d.getHours(), d.getMinutes(), d.getSeconds(), d.getMilliseconds()]
-      : [d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate(), d.getUTCHours(), d.getUTCMinutes(), d.getUTCSeconds(), d.getUTCMilliseconds()];
+      ? [
+          d.getFullYear(),
+          d.getMonth() + 1,
+          d.getDate(),
+          d.getHours(),
+          d.getMinutes(),
+          d.getSeconds(),
+          d.getMilliseconds(),
+        ]
+      : [
+          d.getUTCFullYear(),
+          d.getUTCMonth() + 1,
+          d.getUTCDate(),
+          d.getUTCHours(),
+          d.getUTCMinutes(),
+          d.getUTCSeconds(),
+          d.getUTCMilliseconds(),
+        ];
     let out = `${Y}-${pad(Mo)}-${pad(D)} ${pad(h)}:${pad(m)}:${pad(s)}`;
     if (withFrac && frac) out += `.${pad(frac, 3)}`;
     return out;
@@ -152,7 +169,10 @@
       if (t.kind === "date") return fmtDate(value);
       if (t.kind === "time") return fmtTime(value, t.unit);
     }
-    if (col.numeric && (typeof value === "number" || typeof value === "bigint")) {
+    if (
+      col.numeric &&
+      (typeof value === "number" || typeof value === "bigint")
+    ) {
       return toSigFigs(value);
     }
     return value;
@@ -245,7 +265,8 @@
           {#each columns as col}
             <th class:numeric={col.numeric} title={col.name}>
               <span class="col-name">{col.name}</span>
-              {#if col.zoneLabel}<span class="col-zone">({col.zoneLabel})</span>{/if}
+              {#if col.zoneLabel}<span class="col-zone">({col.zoneLabel})</span
+                >{/if}
             </th>
           {/each}
         </tr>
@@ -386,7 +407,7 @@
        .table-scroll wrapper scrolls horizontally. */
     width: max-content;
     table-layout: auto;
-    font-size: 0.85rem;
+    font-size: 0.81rem;
   }
 
   thead th {
