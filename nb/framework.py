@@ -87,7 +87,7 @@ def _create_display_record(
         from plotly.basedatatypes import BaseFigure
 
         if isinstance(obj, BaseFigure):
-            return DisplayRecord(type="plotly", payload=json.loads(obj.to_json()))
+            return DisplayRecord(type="plotly", payload=json.loads(cast(str, obj.to_json())))
     except (ImportError, AttributeError):
         pass
 
@@ -252,7 +252,11 @@ def _check_purity(code: types.CodeType, func_name: str) -> None:
             _check_purity(instr.argval, func_name)
 
 
-def nb_cache(func: F | None = None, *, keys: list[str] | None = None) -> F:
+@overload
+def nb_cache(func: F) -> F: ...
+@overload
+def nb_cache(*, keys: list[str] | None = None) -> Callable[[F], F]: ...
+def nb_cache(func: F | None = None, *, keys: list[str] | None = None) -> F | Callable[[F], F]:
     # Known limitation: a set/frozenset *constant* in the function body lands in
     # co_consts and is pickled by _code_fingerprint. pickle.dumps serializes set
     # elements in iteration order, which for str/bytes depends on PYTHONHASHSEED,
@@ -284,7 +288,7 @@ def nb_cache(func: F | None = None, *, keys: list[str] | None = None) -> F:
         )
 
         @wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
             # new_globals is a frozen copy taken at decoration time (with our
             # capturing display swapped in); refresh it from the live notebook
             # globals each call so the function sees current values, never

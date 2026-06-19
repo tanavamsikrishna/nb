@@ -1,3 +1,5 @@
+import types
+
 import numpy as np
 import polars as pl
 import pytest
@@ -58,7 +60,7 @@ def test_hash_value() -> None:
     assert _hash_value(m1) != _hash_value(m3)
 
 
-def _compile_func(src: str):
+def _compile_func(src: str) -> types.FunctionType:
     # Compile a top-level `def f(...)` from source and return the function. Using a
     # fixed name `f` lets us compare two source variants without co_name differences.
     ns: dict = {}

@@ -107,8 +107,7 @@ def main() -> None:
     "-w",
     is_flag=True,
     default=False,
-    help="Re-run the notebook automatically whenever the file changes "
-    "(Ctrl-C to stop).",
+    help="Re-run the notebook automatically whenever the file changes (Ctrl-C to stop).",
 )
 def run(notebook: Path, clear_cache: str | None, clear_cache_all: bool, watch: bool) -> None:
     notebook_path = notebook.resolve()

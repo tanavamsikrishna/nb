@@ -183,7 +183,7 @@ async def handle_ipc_client(reader: asyncio.StreamReader, writer: asyncio.Stream
                 pass
 
 
-async def open_site_in_browser(site_url):
+async def open_site_in_browser(site_url: str) -> None:
     await asyncio.sleep(0.5)
 
     process = await asyncio.subprocess.create_subprocess_exec(
