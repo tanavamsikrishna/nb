@@ -47,7 +47,9 @@
     const newBuf = `_nb_${viewName}_${bufSeq++}.parquet`;
     const buf = Uint8Array.from(atob(data), (c) => c.charCodeAt(0));
     await db.registerFileBuffer(newBuf, buf);
-    await conn.query(`CREATE OR REPLACE VIEW "${viewName}" AS FROM '${newBuf}'`);
+    await conn.query(
+      `CREATE OR REPLACE VIEW "${viewName}" AS FROM '${newBuf}'`,
+    );
     const prev = currentBuf;
     currentBuf = newBuf;
     if (prev) db.dropFile?.(prev);

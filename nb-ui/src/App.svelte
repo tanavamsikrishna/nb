@@ -46,7 +46,7 @@
         <span class="logo-sub">notebook stream</span>
         {#if $notebookPath}
           <span class="notebook-path" use:tooltip={$notebookPath}>
-            <span class="notebook-path-text">{'‎' + $notebookPath}</span>
+            <span class="notebook-path-text">{"‎" + $notebookPath}</span>
           </span>
         {/if}
       </div>
