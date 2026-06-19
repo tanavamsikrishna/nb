@@ -22,11 +22,13 @@
     notebookHeader,
     notebookPath,
     connectionStatus,
+    runningCell,
   } from "./stores/cells";
   import { connectStream } from "./lib/stream";
   import { tooltip } from "./lib/tooltip";
   import NotebookHeader from "./components/NotebookHeader.svelte";
   import Cell from "./components/Cell.svelte";
+  import RunSummary from "./components/RunSummary.svelte";
 
   onMount(() => {
     connectStream();
@@ -59,6 +61,19 @@
         {/if}
       </div>
     </div>
+
+    <!-- Live "now executing" indicator: only present while a cell runs. -->
+    {#if $runningCell}
+      <div class="exec-bar">
+        <div class="exec-content">
+          <div class="run-dot" aria-hidden="true"></div>
+          <span class="exec-num">Cell {$runningCell.id + 1}</span>
+          {#if $runningCell.title}
+            <span class="exec-title">{$runningCell.title}</span>
+          {/if}
+        </div>
+      </div>
+    {/if}
   </header>
 
   <!-- Main Content Area -->
@@ -67,38 +82,45 @@
       <NotebookHeader docstring={$notebookHeader} />
     {/if}
 
-    <div class="cells-list">
-      {#each $cells as cell (cell.id)}
-        <Cell {cell} />
-      {:else}
-        <div class="empty-state">
-          <div class="empty-icon-wrap">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke-width="1.5"
-              stroke="currentColor"
-              class="empty-icon"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5"
-              />
-            </svg>
-          </div>
-          <h2>No Active Notebook Stream</h2>
-          <p>
-            The UI is waiting for a notebook execution. Start a run using the
-            command line:
-          </p>
-          <code class="cmd-example"
-            >nb run <span class="arg">my_notebook.py</span></code
+    {#if $cells.length === 0}
+      <div class="empty-state">
+        <div class="empty-icon-wrap">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke-width="1.5"
+            stroke="currentColor"
+            class="empty-icon"
           >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5"
+            />
+          </svg>
         </div>
-      {/each}
-    </div>
+        <h2>No Active Notebook Stream</h2>
+        <p>
+          The UI is waiting for a notebook execution. Start a run using the
+          command line:
+        </p>
+        <code class="cmd-example"
+          >nb run <span class="arg">my_notebook.py</span></code
+        >
+      </div>
+    {:else}
+      <!-- Only cells that produced output are rendered; cells with no display
+           records (imports, pure computation) stay hidden. Cell ids are kept
+           as-is so visible numbers still match the notebook. -->
+      <div class="cells-list">
+        {#each $cells.filter((c) => c.records.length > 0) as cell (cell.id)}
+          <Cell {cell} />
+        {/each}
+      </div>
+
+      <RunSummary cells={$cells} />
+    {/if}
   </main>
 </div>
 
@@ -190,6 +212,55 @@
     /* Left-truncate so the filename (end of the path) stays visible. */
     direction: rtl;
     text-align: left;
+  }
+
+  /* Live executing indicator */
+  .exec-bar {
+    border-top: 1px solid var(--border-subtle);
+    background: var(--bg-sunken);
+  }
+
+  .exec-content {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 6px 24px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-sans);
+    font-size: 12px;
+  }
+
+  .exec-bar .run-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: #b36200;
+    flex-shrink: 0;
+    animation: nb-pulse 1.2s ease-in-out infinite;
+  }
+
+  .exec-num {
+    font-weight: 600;
+    color: var(--fg-secondary);
+    flex-shrink: 0;
+  }
+
+  .exec-title {
+    color: var(--fg-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  @keyframes nb-pulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.3;
+    }
   }
 
   /* Connection status */

@@ -27,6 +27,37 @@ b = 2
     assert cells[1].source_line == 8
 
 
+def test_cells_kept_with_stable_numbering_and_titles() -> None:
+    source = '''"""header"""
+# %% setup
+import os
+
+# %%
+df = load()
+display(df)
+
+# %%
+
+# %% last
+z = 2
+'''
+    _, cells = parse_notebook(source)
+
+    # The leading docstring is the notebook header, not a cell. Every `# %%`
+    # cell is kept and numbered by position — including the empty-body cell
+    # (id 2) — so UI numbers line up with the notebook. The UI hides cells
+    # that render nothing; it does not renumber them away.
+    assert [c.id for c in cells] == [0, 1, 2, 3]
+
+    # Explicit label kept verbatim.
+    assert cells[0].title == "setup"
+    # No label -> fabricated from the first non-empty line, wrapped in quotes.
+    assert cells[1].title == '"df = load()"'
+    # Empty-body cell: no label and no source line to derive from.
+    assert cells[2].title == ""
+    assert cells[3].title == "last"
+
+
 def test_run_notebook(tmp_path: Path) -> None:
     nb_file = tmp_path / "test_nb.py"
     nb_file.write_text("""# %%

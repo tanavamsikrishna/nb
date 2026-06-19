@@ -3,6 +3,7 @@ import {
   connectionStatus,
   notebookHeader,
   notebookPath,
+  runningCell,
 } from "../stores/cells";
 import { getDb } from "./duckdb";
 
@@ -38,6 +39,7 @@ export function connectStream() {
 
   eventSource.addEventListener("cell_start", (e) => {
     const { cell_id, title } = JSON.parse(e.data);
+    runningCell.set({ id: cell_id, title });
     cells.update((cs) => {
       const cell = cs.find((c) => c.id === cell_id);
       if (cell) {
@@ -90,10 +92,12 @@ export function connectStream() {
   });
 
   eventSource.addEventListener("run_end", (e) => {
+    runningCell.set(null);
     finalizeRun();
   });
 
   eventSource.onerror = (err) => {
+    runningCell.set(null);
     connectionStatus.set("disconnected");
     console.error("EventSource connection error:", err);
   };

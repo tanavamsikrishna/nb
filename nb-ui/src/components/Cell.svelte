@@ -119,6 +119,7 @@
       {#if cell.status === "running"}
         <div class="run-dot" aria-hidden="true"></div>
       {/if}
+      <span class="cell-num">Cell {cell.id + 1}</span>
       {#if cell.title}
         <span class="cell-title">{cell.title}</span>
       {/if}
@@ -126,13 +127,6 @@
         <span class="stale-badge">Stale</span>
       {/if}
     </div>
-
-    {#if cell.profiling && (cell.profiling.wall_ms >= 1 || cell.profiling.cpu_ms >= 1)}
-      <div class="cell-stats">
-        <span>{cell.profiling.wall_ms}ms wall</span>
-        <span>{cell.profiling.cpu_ms}ms cpu</span>
-      </div>
-    {/if}
   </div>
 
   <!-- Cell Outputs -->
@@ -229,11 +223,12 @@
     animation: nb-pulse 1.2s ease-in-out infinite;
   }
 
-  .cell-name {
-    font-size: 0.85rem;
+  .cell-num {
+    font-size: 11px;
     font-weight: 600;
-    color: var(--fg-secondary);
-    font-family: var(--font-sans);
+    color: var(--fg-tertiary);
+    font-family: var(--font-mono);
+    flex-shrink: 0;
   }
 
   .cell-title {
@@ -252,15 +247,6 @@
     border-radius: var(--radius-full);
     font-size: 0.75rem;
     font-weight: 500;
-  }
-
-  .cell-stats {
-    margin-left: auto;
-    font-size: 10px;
-    color: var(--fg-tertiary);
-    font-family: var(--font-mono);
-    display: flex;
-    gap: 10px;
   }
 
   /* Outputs Area */

@@ -16,6 +16,27 @@ class Cell:
     code: str
 
 
+def _first_nonempty_line(code: str) -> str:
+    for line in code.splitlines():
+        stripped = line.strip()
+        if stripped:
+            return stripped
+    return ""
+
+
+def _make_cell(cell_id: int, label: str, source_line: int, code: str) -> "Cell":
+    # A cell's title is fabricated here so the frontend only ever renders a
+    # finished string. An explicit `# %% label` wins; otherwise we derive one
+    # from the first non-empty line of code and wrap it in quotes to mark it as
+    # derived rather than author-provided.
+    title = label
+    if not title:
+        first = _first_nonempty_line(code)
+        if first:
+            title = f'"{first}"'
+    return Cell(id=cell_id, title=title, source_line=source_line, code=code)
+
+
 def _is_empty_or_only_docstring(code: str) -> bool:
     stripped = code.strip()
     if not stripped:
@@ -56,18 +77,15 @@ def parse_notebook(source: str) -> Tuple[str | None, List[Cell]]:
         stripped = line.strip()
         if stripped.startswith("# %%"):
             code = "".join(current_cell_lines)
+            # Skip only the leading header segment (module docstring / comments
+            # before the first `# %%`). Every real `# %%` cell is kept and
+            # numbered by position, so UI cell numbers line up with the
+            # notebook. Cells that render nothing are hidden by the frontend,
+            # but their number is still reserved here.
             if cell_id == 0 and _is_empty_or_only_docstring(code):
-                # Skip cell 0 if it contains only the docstring/comments
                 pass
             else:
-                cells.append(
-                    Cell(
-                        id=cell_id,
-                        title=current_label,
-                        source_line=current_source_line,
-                        code=code,
-                    )
-                )
+                cells.append(_make_cell(cell_id, current_label, current_source_line, code))
                 cell_id += 1
 
             current_cell_lines = []
@@ -81,14 +99,7 @@ def parse_notebook(source: str) -> Tuple[str | None, List[Cell]]:
     if cell_id == 0 and _is_empty_or_only_docstring(code):
         pass
     else:
-        cells.append(
-            Cell(
-                id=cell_id,
-                title=current_label,
-                source_line=current_source_line,
-                code=code,
-            )
-        )
+        cells.append(_make_cell(cell_id, current_label, current_source_line, code))
         cell_id += 1
 
     # Fallback to single empty cell if empty

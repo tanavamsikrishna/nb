@@ -105,6 +105,9 @@ events = pl.DataFrame(
 )
 display(events)
 
+# %% Empty cell test
+time.sleep(2)
+
 # %% Collapsible Object Wrapper
 time.sleep(1)
 my_data = {
