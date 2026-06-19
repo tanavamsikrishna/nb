@@ -23,17 +23,18 @@
   import JSONTree from "./JSONTree.svelte";
   import DataTable from "./DataTable.svelte";
   import { loadPlotly, loadVega } from "../lib/lazy_load";
+  import type { Cell, PlotlyPayload } from "../lib/types";
 
   // Svelte 5 props
-  let { cell } = $props();
+  let { cell }: { cell: Cell } = $props();
 
   // Svelte actions for third party rendering. Outputs are no longer remounted
   // on re-run (records are updated in place), so each action must re-render
   // when its payload changes via the `update` callback rather than only on
   // mount.
-  function plotlyAction(node, payload) {
+  function plotlyAction(node: HTMLElement, payload: PlotlyPayload) {
     let active = true;
-    function render(p) {
+    function render(p: PlotlyPayload) {
       loadPlotly()
         .then((Plotly) => {
           if (active) {
@@ -54,7 +55,7 @@
     }
     render(payload);
     return {
-      update(p) {
+      update(p: PlotlyPayload) {
         render(p);
       },
       destroy() {
@@ -66,10 +67,10 @@
     };
   }
 
-  function altairAction(node, payload) {
+  function altairAction(node: HTMLElement, payload: unknown) {
     let active = true;
-    let view = null;
-    function render(spec) {
+    let view: any = null;
+    function render(spec: unknown) {
       loadVega()
         .then((vegaEmbed) => {
           if (!active) return;
@@ -94,7 +95,7 @@
     }
     render(payload);
     return {
-      update(spec) {
+      update(spec: unknown) {
         render(spec);
       },
       destroy() {
@@ -113,7 +114,7 @@
   <!-- Cell Header / Status Bar -->
   <div
     class="cell-header"
-    class:no-output={cell.records.length === 0 && cell.status === "done"}
+    class:no-output={cell.records.length === 0 && cell.status === "ok"}
   >
     <div class="left-header">
       {#if cell.status === "running"}

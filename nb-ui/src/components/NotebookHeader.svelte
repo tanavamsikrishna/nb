@@ -16,7 +16,7 @@
   import Markdown from "./Markdown.svelte";
 
   // Svelte 5 props
-  let { docstring = "" } = $props();
+  let { docstring = "" }: { docstring?: string } = $props();
 </script>
 
 <div class="notebook-header">

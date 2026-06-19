@@ -17,21 +17,53 @@
   Constraints: conn must be an active AsyncDuckDB connection.
 -->
 <script lang="ts">
+  import type { AsyncDuckDBConnection } from "@duckdb/duckdb-wasm";
   import { tooltip } from "../lib/tooltip";
+
+  // Classification of a temporal column, derived from the Arrow type (see
+  // temporalInfo). `null` for non-temporal columns.
+  type TemporalInfo =
+    | { kind: "timestamp"; local: boolean }
+    | { kind: "date" }
+    | { kind: "time"; unit: number }
+    | null;
+
+  interface Column {
+    name: string;
+    numeric: boolean;
+    temporal: TemporalInfo;
+    zoneLabel: string;
+  }
+
+  // The slice of an Arrow `DataType` the formatters actually read. Structural
+  // so we don't pull in apache-arrow's generic types just to annotate.
+  type ArrowType = { typeId?: number; timezone?: string | null; unit?: number };
+
+  type Row = Record<string, any>;
 
   const MAX_DISPLAY_ROWS = 25;
 
-  const { conn, viewName, totalRows, reload } = $props();
+  const {
+    conn,
+    viewName,
+    totalRows,
+    reload,
+  }: {
+    conn: AsyncDuckDBConnection;
+    viewName: string;
+    totalRows: number;
+    reload: number;
+  } = $props();
 
   const defaultSql = `SELECT * FROM ${viewName} `;
   let sql = $state(defaultSql);
   let submittedSql = $state(defaultSql);
   let dirty = $derived(sql !== submittedSql);
 
-  let rows = $state([]);
-  let columns = $state([]);
+  let rows = $state<Row[]>([]);
+  let columns = $state<Column[]>([]);
   let totalResultRows = $state(0);
-  let queryError = $state(null);
+  let queryError = $state<string | null>(null);
   let loading = $state(false);
 
   async function execute() {
@@ -59,7 +91,7 @@
       const displayRows = Math.min(dataResult.numRows, MAX_DISPLAY_ROWS);
       rows = [];
       for (let i = 0; i < displayRows; i++) {
-        const row = {};
+        const row: Row = {};
         for (const col of columns) {
           const val = dataResult.getChild(col.name)?.get(i);
           row[col.name] = val === null || val === undefined ? null : val;
@@ -73,7 +105,7 @@
     }
   }
 
-  function isNumericType(type) {
+  function isNumericType(type: ArrowType): boolean {
     const typeId = type?.typeId;
     // Arrow type IDs: Int = 2, Float = 3, Decimal = 7
     return typeId === 2 || typeId === 3 || typeId === 7;
@@ -83,7 +115,7 @@
   // non-temporal types. Arrow type IDs: Date = 8, Time = 9, Timestamp = 10.
   // For timestamps, `local` distinguishes tz-aware (a true instant → convert to
   // the browser zone) from naive (a bare wall-clock → render verbatim, no zone).
-  function temporalInfo(type) {
+  function temporalInfo(type: ArrowType): TemporalInfo {
     const id = type?.typeId;
     if (id === 10) return { kind: "timestamp", local: type.timezone != null };
     if (id === 8) return { kind: "date" };
@@ -95,15 +127,16 @@
   // tz-aware timestamp columns so the displayed local times are unambiguous.
   const LOCAL_TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-  const num = (v) => (typeof v === "bigint" ? Number(v) : v);
-  const pad = (n, w = 2) => String(n).padStart(w, "0");
+  const num = (v: number | bigint): number =>
+    typeof v === "bigint" ? Number(v) : v;
+  const pad = (n: number, w = 2) => String(n).padStart(w, "0");
 
   // apache-arrow returns timestamps as ms-since-epoch. For tz-aware columns the
   // ms is a real instant → use local getters. For naive columns the ms encodes
   // the wall clock as if UTC → use UTC getters so we don't shift it by the
   // local offset. Sub-second detail is omitted unless `withFrac` (cells stay to
   // second resolution; the tooltip shows the full value).
-  function fmtTimestamp(ms, local, withFrac = false) {
+  function fmtTimestamp(ms: number | bigint, local: boolean, withFrac = false) {
     const d = new Date(num(ms));
     const [Y, Mo, D, h, m, s, frac] = local
       ? [
@@ -130,14 +163,14 @@
   }
 
   // Date is a calendar date (ms at UTC midnight) — format date-only via UTC.
-  function fmtDate(ms) {
+  function fmtDate(ms: number | bigint) {
     const d = new Date(num(ms));
     return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
   }
 
   // Time is a count since midnight in the column's unit (0=s,1=ms,2=us,3=ns).
   // Sub-second detail is omitted unless `withFrac` (tooltip only).
-  function fmtTime(value, unit, withFrac = false) {
+  function fmtTime(value: number | bigint, unit: number, withFrac = false) {
     const div = [1, 1e3, 1e6, 1e9][unit] ?? 1;
     const totalSec = num(value) / div;
     const sInt = Math.floor(totalSec % 60);
@@ -152,7 +185,7 @@
   // Round a number (or Int64 BigInt) to SIG_FIGS significant digits for display.
   // Trailing zeros from the rounding are dropped (via Number()), so e.g.
   // 123456 -> "123460", 0.123456 -> "0.12346", 1.5 -> "1.5".
-  function toSigFigs(value) {
+  function toSigFigs(value: number | bigint) {
     const num = typeof value === "bigint" ? Number(value) : value;
     if (!Number.isFinite(num)) return String(value);
     if (num === 0) return "0";
@@ -162,7 +195,7 @@
   // Value shown in the cell: temporal columns are formatted as date/time
   // strings; numeric columns are rounded to SIG_FIGS. The full / unambiguous
   // value is preserved in the hover tooltip (see tooltipValue + template).
-  function displayValue(value, col) {
+  function displayValue(value: any, col: Column) {
     const t = col.temporal;
     if (t) {
       if (t.kind === "timestamp") return fmtTimestamp(value, t.local);
@@ -183,7 +216,7 @@
   // unambiguous UTC instant). Naive timestamps and times only get a tooltip
   // when they actually have sub-second detail to reveal; dates never do.
   // Non-temporal columns fall back to the full untruncated/unrounded value.
-  function tooltipValue(value, col) {
+  function tooltipValue(value: any, col: Column) {
     if (value === null || value === undefined) return null;
     const t = col.temporal;
     if (t?.kind === "timestamp") {
@@ -210,7 +243,7 @@
     execute();
   }
 
-  function handleKeydown(e) {
+  function handleKeydown(e: KeyboardEvent) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       submit();

@@ -1,7 +1,16 @@
-let plotlyPromise = null;
-let vegaPromise = null;
+// Plotly and vega-embed are attached to `window` by the CDN scripts loaded
+// below; they have no bundled types, so they are typed as `any`.
+declare global {
+  interface Window {
+    Plotly?: any;
+    vegaEmbed?: any;
+  }
+}
 
-export function loadPlotly() {
+let plotlyPromise: Promise<any> | null = null;
+let vegaPromise: Promise<any> | null = null;
+
+export function loadPlotly(): Promise<any> {
   if (plotlyPromise) return plotlyPromise;
 
   plotlyPromise = new Promise((resolve, reject) => {
@@ -24,7 +33,7 @@ export function loadPlotly() {
   return plotlyPromise;
 }
 
-export function loadVega() {
+export function loadVega(): Promise<any> {
   if (vegaPromise) return vegaPromise;
 
   vegaPromise = new Promise((resolve, reject) => {

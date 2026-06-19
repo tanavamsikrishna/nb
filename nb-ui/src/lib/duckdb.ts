@@ -14,14 +14,14 @@ const BUNDLES = {
   eh: { mainModule: eh_wasm, mainWorker: eh_worker },
 };
 
-let _promise = null;
+let _promise: Promise<duckdb.AsyncDuckDB> | null = null;
 
-export function getDb() {
+export function getDb(): Promise<duckdb.AsyncDuckDB> {
   if (!_promise) _promise = _init();
   return _promise;
 }
 
-async function _init() {
+async function _init(): Promise<duckdb.AsyncDuckDB> {
   const bundle = await duckdb.selectBundle(BUNDLES);
   const worker = new Worker(bundle.mainWorker);
   const db = new duckdb.AsyncDuckDB(new duckdb.ConsoleLogger(), worker);

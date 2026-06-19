@@ -28,22 +28,24 @@
 
 <script lang="ts">
   import { onDestroy } from "svelte";
+  import type { AsyncDuckDB, AsyncDuckDBConnection } from "@duckdb/duckdb-wasm";
   import { getDb } from "$lib/duckdb";
+  import type { TablePayload } from "$lib/types";
   import DataTableView from "./DataTableView.svelte";
 
-  let { payload } = $props();
+  let { payload }: { payload: TablePayload } = $props();
 
   const viewName = nextName();
 
-  let conn = null;
+  let conn: AsyncDuckDBConnection | null = null;
   let bufSeq = 0;
-  let currentBuf = null; // file name the stable view currently points at
-  let lastData = null; // last payload.data registered (skip redundant work)
+  let currentBuf: string | null = null; // file name the stable view currently points at
+  let lastData: string | null = null; // last payload.data registered (skip redundant work)
   let reload = $state(0); // bump to signal DataTableView to re-execute
 
   // Register payload.data as a fresh buffer and repoint the stable view at it,
   // then drop the previously-registered buffer.
-  async function register(db, data) {
+  async function register(db: AsyncDuckDB, data: string) {
     const newBuf = `_nb_${viewName}_${bufSeq++}.parquet`;
     const buf = Uint8Array.from(atob(data), (c) => c.charCodeAt(0));
     await db.registerFileBuffer(newBuf, buf);

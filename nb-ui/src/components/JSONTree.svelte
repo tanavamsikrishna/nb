@@ -18,12 +18,17 @@
 <script lang="ts">
   import JSONTree from "./JSONTree.svelte";
 
-  let { val, label = "", depth = 0, isLast = true } = $props();
+  let {
+    val,
+    label = "",
+    depth = 0,
+    isLast = true,
+  }: { val: any; label?: string; depth?: number; isLast?: boolean } = $props();
 
   /* svelte-ignore state_referenced_locally */
   let expanded = $state(depth < 2);
 
-  function toggle(e) {
+  function toggle(e: MouseEvent) {
     e.stopPropagation();
     expanded = !expanded;
   }

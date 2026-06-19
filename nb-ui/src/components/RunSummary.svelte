@@ -12,7 +12,9 @@
   Constraints: Svelte 5 runes ($props, $derived).
 -->
 <script lang="ts">
-  let { cells = [] } = $props();
+  import type { Cell } from "../lib/types";
+
+  let { cells = [] }: { cells: Cell[] } = $props();
 
   // Only cells that actually ran carry profiling. Preserve run order by id.
   let timed = $derived(

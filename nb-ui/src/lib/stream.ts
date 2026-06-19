@@ -7,11 +7,19 @@ import {
   runError,
 } from "../stores/cells";
 import { getDb } from "./duckdb";
+import type {
+  Cell,
+  CellEndEvent,
+  CellManifestItem,
+  CellStartEvent,
+  NotebookHeaderEvent,
+  RunStartEvent,
+} from "./types";
 
 // Pre-warm DuckDB-WASM in background (~8MB lazy load, cached after first load)
 getDb();
 
-let eventSource = null;
+let eventSource: EventSource | null = null;
 
 export function connectStream() {
   if (eventSource) {
@@ -26,7 +34,7 @@ export function connectStream() {
   };
 
   eventSource.addEventListener("notebook_header", (e) => {
-    const data = JSON.parse(e.data);
+    const data: NotebookHeaderEvent = JSON.parse(e.data);
     notebookPath.set(data.path);
     if (data.docstring) {
       notebookHeader.set(data.docstring);
@@ -34,7 +42,7 @@ export function connectStream() {
   });
 
   eventSource.addEventListener("run_start", (e) => {
-    const data = JSON.parse(e.data);
+    const data: RunStartEvent = JSON.parse(e.data);
     // A fresh run clears the previous error banner; this is the only place it
     // is cleared, which is what keeps it sticky across run_end.
     runError.set(null);
@@ -42,7 +50,7 @@ export function connectStream() {
   });
 
   eventSource.addEventListener("cell_start", (e) => {
-    const { cell_id, title } = JSON.parse(e.data);
+    const { cell_id, title }: CellStartEvent = JSON.parse(e.data);
     runningCell.set({ id: cell_id, title });
     cells.update((cs) => {
       const cell = cs.find((c) => c.id === cell_id);
@@ -78,7 +86,8 @@ export function connectStream() {
   });
 
   eventSource.addEventListener("cell_end", (e) => {
-    const { cell_id, wall_ms, cpu_ms, status, error } = JSON.parse(e.data);
+    const { cell_id, wall_ms, cpu_ms, status, error }: CellEndEvent =
+      JSON.parse(e.data);
     cells.update((cs) => {
       const cell = cs.find((c) => c.id === cell_id);
       if (cell) {
@@ -111,10 +120,10 @@ export function connectStream() {
   };
 }
 
-function reconcile(manifest) {
+function reconcile(manifest: CellManifestItem[]) {
   cells.update((currentCells) => {
     const manifestIds = new Set(manifest.map((c) => c.id));
-    const updatedCells = [];
+    const updatedCells: Cell[] = [];
 
     for (const item of manifest) {
       const existing = currentCells.find((c) => c.id === item.id);

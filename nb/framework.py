@@ -253,6 +253,13 @@ def _check_purity(code: types.CodeType, func_name: str) -> None:
 
 
 def nb_cache(func: F | None = None, *, keys: list[str] | None = None) -> F:
+    # Known limitation: a set/frozenset *constant* in the function body lands in
+    # co_consts and is pickled by _code_fingerprint. pickle.dumps serializes set
+    # elements in iteration order, which for str/bytes depends on PYTHONHASHSEED,
+    # so the key is only stable within a single process. Harmless today because the
+    # cache is in-memory and dies with the daemon (a restart clears it anyway) — but
+    # if entries are ever persisted across processes, canonicalize (sort) set
+    # elements before hashing, since equal sets could otherwise key differently.
     def decorator(func: F) -> F:
         _check_purity(func.__code__, func.__name__)
 
