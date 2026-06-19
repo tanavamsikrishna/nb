@@ -71,8 +71,9 @@ display(x)
         events.append((event_type, event_data))
 
     exec_ns = {}
-    run_notebook(nb_file, exec_ns, emit_event)
+    errored = run_notebook(nb_file, exec_ns, emit_event)
 
+    assert errored is False
     event_types = [e[0] for e in events]
     assert "run_start" in event_types
     assert "cell_start" in event_types
@@ -86,6 +87,43 @@ display(x)
     assert exec_ns.get("x") == 10
 
 
+def test_run_notebook_captures_stdout_stderr(tmp_path: Path) -> None:
+    # print()/stderr writes are routed to log_sink (→ the `nb run` terminal),
+    # NOT emitted as display records to the browser.
+    nb_file = tmp_path / "io_nb.py"
+    nb_file.write_text("""# %%
+import sys
+print("hello stdout")
+print("oops", file=sys.stderr)
+""")
+
+    events: List[Tuple[str, dict]] = []
+    logs: List[Tuple[str, str]] = []
+
+    errored = run_notebook(
+        nb_file,
+        {},
+        lambda t, d: events.append((t, d)),
+        lambda stream, data: logs.append((stream, data)),
+    )
+
+    assert errored is False
+    assert ("stdout", "hello stdout") in logs
+    assert ("stdout", "\n") in logs  # print() writes the newline separately
+    assert ("stderr", "oops") in logs
+    # Console output must not leak into the browser as display records.
+    assert not any(t == "display_record" for t, _ in events)
+
+
+def test_run_notebook_log_sink_optional(tmp_path: Path) -> None:
+    # Without a log_sink the real streams stay in place (standalone/test usage).
+    nb_file = tmp_path / "io_nb.py"
+    nb_file.write_text('# %%\nprint("standalone")\n')
+
+    errored = run_notebook(nb_file, {}, lambda t, d: None)
+    assert errored is False
+
+
 def test_run_notebook_syntax_error(tmp_path: Path) -> None:
     # A SyntaxError raises in compile() before timing starts. The error handler
     # must still report the cell/run as failed rather than blowing up on
@@ -94,18 +132,23 @@ def test_run_notebook_syntax_error(tmp_path: Path) -> None:
     nb_file.write_text("# %%\nx = (\n")  # unterminated — SyntaxError at compile
 
     events: List[Tuple[str, dict]] = []
+    logs: List[Tuple[str, str]] = []
 
     def emit_event(event_type: str, event_data: dict) -> None:
         events.append((event_type, event_data))
 
     # Should not raise (previously NameError on wall_ms in the except block).
-    run_notebook(nb_file, {}, emit_event)
+    errored = run_notebook(nb_file, {}, emit_event, lambda s, d: logs.append((s, d)))
 
+    assert errored is True
     cell_end = next(d for t, d in events if t == "cell_end")
     assert cell_end["status"] == "error"
     assert cell_end["wall_ms"] == 0 and cell_end["cpu_ms"] == 0
-    # The traceback is surfaced as a text record, and the run ends in error.
-    assert any(t == "display_record" and d["type"] == "text" for t, d in events)
+    # The brief notice rides on cell_end (shown in the UI header); the full
+    # traceback goes to the CLI via log_sink, NOT to the browser.
+    assert "error" in cell_end and cell_end["error"]
+    assert any(stream == "stderr" and "SyntaxError" in data for stream, data in logs)
+    assert not any(t == "display_record" for t, d in events)
     assert events[-1] == ("run_end", {"status": "error"})
 
 
@@ -127,13 +170,15 @@ def test_traceback_uses_file_relative_line_numbers(tmp_path: Path) -> None:
     )
 
     events: List[Tuple[str, dict]] = []
+    logs: List[Tuple[str, str]] = []
 
     def emit_event(event_type: str, event_data: dict) -> None:
         events.append((event_type, event_data))
 
-    run_notebook(nb_file, {}, emit_event)
+    run_notebook(nb_file, {}, emit_event, lambda s, d: logs.append((s, d)))
 
-    tb = next(d["payload"] for t, d in events if t == "display_record" and d["type"] == "text")
+    # The full traceback is streamed to the CLI via log_sink (stderr stream).
+    tb = next(data for stream, data in logs if stream == "stderr")
     assert "ZeroDivisionError" in tb
     # The notebook frame reports the file-relative line (9), not the cell-relative
     # line (2). Match the notebook file's frame specifically so we don't pick up

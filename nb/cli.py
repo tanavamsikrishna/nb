@@ -59,6 +59,13 @@ def _send_run(socket_path: Path, req: dict) -> bool:
             if status == "cache":
                 _report_cache(msg.get("cache") or {})
                 continue
+            if status == "stdout":
+                # Raw passthrough so notebook output looks like a normal program's.
+                click.echo(msg.get("data", ""), nl=False)
+                continue
+            if status == "stderr":
+                click.echo(msg.get("data", ""), nl=False, err=True)
+                continue
             if status == "ok":
                 click.echo(
                     f"Notebook execution requested successfully. View output at {NOTEBOOK_URL}"

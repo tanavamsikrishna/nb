@@ -107,6 +107,14 @@ async def handle_ipc_client(reader: asyncio.StreamReader, writer: asyncio.Stream
             def thread_safe_emit_event(event_type: str, event_data: dict) -> None:
                 loop.call_soon_threadsafe(emit_event, event_type, event_data)
 
+            def cli_log(stream: str, data: str) -> None:
+                # Notebook console output (stdout/stderr/tracebacks) runs in the
+                # executor thread; hop to the loop thread to write the CLI socket.
+                # Fire-and-forget like thread_safe_emit_event; the drain before the
+                # terminal reply flushes the buffer.
+                msg = json.dumps({"status": stream, "data": data}).encode("utf-8") + b"\n"
+                loop.call_soon_threadsafe(writer.write, msg)
+
             try:
                 # Invalidate caches up-front, before any cell runs, so cached
                 # functions recompute on this run. Done here (not in run_notebook)
@@ -137,15 +145,25 @@ async def handle_ipc_client(reader: asyncio.StreamReader, writer: asyncio.Stream
                 }
 
                 # Execute notebook in separate thread so exec doesn't block the main event loop
-                await loop.run_in_executor(
+                errored = await loop.run_in_executor(
                     None,
                     runner.run_notebook,
                     notebook_path,
                     exec_ns,
                     thread_safe_emit_event,
+                    cli_log,
                 )
 
-                writer.write(json.dumps({"status": "ok"}).encode("utf-8") + b"\n")
+                # Reply reflects the run outcome so `nb run` exits non-zero on a
+                # cell error (the full traceback already streamed via cli_log).
+                if errored:
+                    reply = {
+                        "status": "error",
+                        "message": "Notebook execution failed (see output above).",
+                    }
+                else:
+                    reply = {"status": "ok"}
+                writer.write(json.dumps(reply).encode("utf-8") + b"\n")
                 await writer.drain()
             finally:
                 fw._active_emitter = old_emitter

@@ -17,6 +17,38 @@ def unused_tcp_port() -> int:
         return sock.getsockname()[1]
 
 
+async def _run_request(socket_path: Path, req: dict) -> dict:
+    """Send a run request and drain the line-delimited reply stream.
+
+    Returns {"terminal": <ok|error msg>, "stdout": str, "stderr": str},
+    coalescing the non-terminal stdout/stderr passthrough messages.
+    """
+    reader, writer = await asyncio.open_unix_connection(str(socket_path))
+    writer.write(json.dumps(req).encode("utf-8") + b"\n")
+    await writer.drain()
+
+    out, err = "", ""
+    terminal: dict = {}
+    while True:
+        line = await reader.readline()
+        if not line:
+            break
+        msg = json.loads(line.decode("utf-8"))
+        status = msg.get("status")
+        if status == "stdout":
+            out += msg.get("data", "")
+        elif status == "stderr":
+            err += msg.get("data", "")
+        else:  # cache / ok / error are terminal-ish; ok/error end the run
+            terminal = msg
+            if status in ("ok", "error"):
+                break
+
+    writer.close()
+    await writer.wait_closed()
+    return {"terminal": terminal, "stdout": out, "stderr": err}
+
+
 @pytest.mark.asyncio
 async def test_daemon_lifecycle(tmp_path: Path) -> None:
     project_dir = Path(tempfile.mkdtemp(prefix="nb-test-", dir="/private/tmp"))
@@ -44,21 +76,24 @@ async def test_daemon_lifecycle(tmp_path: Path) -> None:
             assert resp.status == 200
             assert await resp.text() == "Hello UI"
 
-    # 2. Test Unix Socket runner IPC
+    # 2. Test Unix Socket runner IPC — print() is forwarded to the CLI as a
+    #    stdout passthrough message, and the run reports ok.
     notebook_path = tmp_path / "notebook.py"
     notebook_path.write_text("# %%\nprint(456)\n")
 
-    reader, writer = await asyncio.open_unix_connection(str(socket_path))
-    req = {"path": str(notebook_path)}
-    writer.write(json.dumps(req).encode("utf-8") + b"\n")
-    await writer.drain()
+    result = await _run_request(socket_path, {"path": str(notebook_path)})
+    assert result["terminal"]["status"] == "ok"
+    assert "456" in result["stdout"]
 
-    line = await reader.readline()
-    resp = json.loads(line.decode("utf-8"))
-    assert resp["status"] == "ok"
+    # 3. A cell that raises reports error (so `nb run` exits non-zero) and the
+    #    full traceback is streamed to the CLI via the stderr channel.
+    err_path = tmp_path / "boom.py"
+    err_path.write_text("# %%\nraise ValueError('boom')\n")
 
-    writer.close()
-    await writer.wait_closed()
+    result = await _run_request(socket_path, {"path": str(err_path)})
+    assert result["terminal"]["status"] == "error"
+    assert "ValueError" in result["stderr"]
+    assert "boom" in result["stderr"]
 
     try:
         task.cancel()

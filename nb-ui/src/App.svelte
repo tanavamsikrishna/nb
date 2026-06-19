@@ -23,6 +23,7 @@
     notebookPath,
     connectionStatus,
     runningCell,
+    runError,
   } from "./stores/cells";
   import { connectStream } from "./lib/stream";
   import { tooltip } from "./lib/tooltip";
@@ -62,8 +63,20 @@
       </div>
     </div>
 
-    <!-- Live "now executing" indicator: only present while a cell runs. -->
-    {#if $runningCell}
+    <!-- Sticky error banner: shown after a run fails, persists until the next
+         run starts. Takes precedence over the live indicator. -->
+    {#if $runError}
+      <div class="exec-bar error">
+        <div class="exec-content">
+          <span class="exec-num">Cell {$runError.id + 1}</span>
+          {#if $runError.title}
+            <span class="exec-title">{$runError.title}</span>
+          {/if}
+          <span class="error-message">{$runError.message}</span>
+        </div>
+      </div>
+      <!-- Live "now executing" indicator: only present while a cell runs. -->
+    {:else if $runningCell}
       <div class="exec-bar">
         <div class="exec-content">
           <div class="run-dot" aria-hidden="true"></div>
@@ -218,6 +231,23 @@
   .exec-bar {
     border-top: 1px solid var(--border-subtle);
     background: var(--bg-sunken);
+  }
+
+  .exec-bar.error {
+    background: color-mix(in srgb, var(--color-error) 10%, var(--bg-sunken));
+    border-top: 1px solid var(--color-error);
+  }
+
+  .exec-bar.error .exec-num {
+    color: var(--color-error);
+  }
+
+  .error-message {
+    color: var(--color-error);
+    font-family: var(--font-mono);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .exec-content {

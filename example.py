@@ -67,9 +67,6 @@ display(pl.concat([df] * 10))
 # %% Date / time types
 
 
-warnings.warn("About to call an non-existent function")
-
-displayx("## Date / time types", as_="md")
 # Exercises every temporal type the table view formats:
 #   event_date   -> Date            (date-only)
 #   local_ts     -> Datetime        (naive: rendered verbatim, no zone)
@@ -150,6 +147,12 @@ display(f"Result 2: {res2}")
 df = pl.DataFrame({"x": ["A", "B", "C"], "y": [10, 20, 15]})
 fig = px.bar(df, x="x", y="y", title="Sample Bar Chart")
 display(fig)
+
+# %% Doing something nasty
+
+warnings.warn("About to call an non-existent function")
+
+displayx("## Date / time types", as_="md")
 
 # %% Display a table
 display(pl.concat([df] * 10))

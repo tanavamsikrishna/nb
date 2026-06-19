@@ -4,6 +4,7 @@ import {
   notebookHeader,
   notebookPath,
   runningCell,
+  runError,
 } from "../stores/cells";
 import { getDb } from "./duckdb";
 
@@ -34,6 +35,9 @@ export function connectStream() {
 
   eventSource.addEventListener("run_start", (e) => {
     const data = JSON.parse(e.data);
+    // A fresh run clears the previous error banner; this is the only place it
+    // is cleared, which is what keeps it sticky across run_end.
+    runError.set(null);
     reconcile(data.cell_manifest);
   });
 
@@ -74,12 +78,16 @@ export function connectStream() {
   });
 
   eventSource.addEventListener("cell_end", (e) => {
-    const { cell_id, wall_ms, cpu_ms, status } = JSON.parse(e.data);
+    const { cell_id, wall_ms, cpu_ms, status, error } = JSON.parse(e.data);
     cells.update((cs) => {
       const cell = cs.find((c) => c.id === cell_id);
       if (cell) {
         cell.status = status;
         cell.profiling = { wall_ms, cpu_ms };
+        if (status === "error") {
+          // Sticky banner in the header; survives run_end, cleared on next run_start.
+          runError.set({ id: cell_id, title: cell.title, message: error });
+        }
         // Drop any records left over from a previous run that this run did
         // not re-emit (outputs that no longer exist).
         const cursor = cell._cursor ?? 0;

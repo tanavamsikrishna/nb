@@ -1,5 +1,7 @@
 import ast
 import linecache
+import sys
+import threading
 import time
 import traceback
 from dataclasses import dataclass
@@ -7,6 +9,44 @@ from pathlib import Path
 from typing import Callable, List, Tuple
 
 import nb.framework as fw
+
+# Callback that receives notebook console output: (stream_name, text) where
+# stream_name is "stdout" or "stderr". The daemon forwards these to the `nb run`
+# CLI socket; a None sink leaves the real streams in place (standalone/tests).
+LogSink = Callable[[str, str], None]
+
+
+class _StreamProxy:
+    """File-like stand-in for sys.stdout/sys.stderr during a run.
+
+    Writes from the executing notebook (which runs on `exec_thread_id`) are
+    forwarded to `log_sink` tagged with `name`. Writes from any other thread —
+    e.g. the daemon's asyncio loop logging while a run is in flight — fall
+    through to the original stream untouched, so only notebook output is
+    captured.
+    """
+
+    def __init__(self, name: str, log_sink: LogSink, original, exec_thread_id: int) -> None:
+        self._name = name
+        self._log_sink = log_sink
+        self._original = original
+        self._exec_thread_id = exec_thread_id
+
+    def write(self, s: str) -> int:
+        if threading.get_ident() == self._exec_thread_id:
+            if s:
+                self._log_sink(self._name, s)
+            return len(s)
+        return self._original.write(s)
+
+    def flush(self) -> None:
+        self._original.flush()
+
+    def writable(self) -> bool:
+        return True
+
+    def isatty(self) -> bool:
+        return False
 
 
 @dataclass
@@ -125,7 +165,14 @@ def run_notebook(
     path: Path,
     exec_ns: dict,
     emit_event: Callable[[str, dict], None],
-) -> None:
+    log_sink: LogSink | None = None,
+) -> bool:
+    """Execute the notebook at `path`. Returns True if a cell (or load) errored.
+
+    `log_sink`, when provided, receives the notebook's stdout/stderr and full
+    tracebacks (raw passthrough for the `nb run` terminal); the browser gets
+    only a brief error notice via the error `cell_end` event.
+    """
     # Cache invalidation happens in the daemon before this runs (see handle_ipc_client),
     # so the cleared-cache report can be sent to the CLI before the notebook executes.
     try:
@@ -133,7 +180,7 @@ def run_notebook(
             source = f.read()
     except Exception as e:
         emit_event("run_end", {"status": "error", "error": f"Failed to read file: {e}"})
-        return
+        return True
 
     # Inject the exact source we're about to run into linecache, keyed by path.
     # Cells are compiled with file-relative line numbers (see padding below), so
@@ -177,6 +224,18 @@ def run_notebook(
 
         fw._active_emitter = runner_emitter
 
+    # Capture notebook stdout/stderr for the duration of the run and route it to
+    # the CLI via log_sink. Process-global, but safe: run_lock serializes runs
+    # and the proxies only capture writes from this (the exec) thread.
+    old_stdout = sys.stdout
+    old_stderr = sys.stderr
+    installed_proxies = log_sink is not None
+    if installed_proxies:
+        exec_thread_id = threading.get_ident()
+        sys.stdout = _StreamProxy("stdout", log_sink, old_stdout, exec_thread_id)
+        sys.stderr = _StreamProxy("stderr", log_sink, old_stderr, exec_thread_id)
+
+    errored = False
     try:
         for cell in cells:
             emit_event(
@@ -217,18 +276,35 @@ def run_notebook(
                 while exc_tb is not None and exc_tb.tb_frame.f_code.co_filename == __file__:
                     exc_tb = exc_tb.tb_next
                 tb = "".join(traceback.format_exception(type(exc), exc, exc_tb))
-                emit_event("display_record", {"cell_id": cell.id, "type": "text", "payload": tb})
+                # Full traceback goes to the CLI (raw stderr passthrough); the
+                # browser gets only a brief notice carried on cell_end.
+                if log_sink is not None:
+                    log_sink("stderr", tb)
+                else:
+                    old_stderr.write(tb)
+                summary = f"{type(exc).__name__}: {exc}"
 
                 emit_event(
                     "cell_end",
-                    {"cell_id": cell.id, "wall_ms": wall_ms, "cpu_ms": cpu_ms, "status": "error"},
+                    {
+                        "cell_id": cell.id,
+                        "wall_ms": wall_ms,
+                        "cpu_ms": cpu_ms,
+                        "status": "error",
+                        "error": summary,
+                    },
                 )
 
                 emit_event("run_end", {"status": "error"})
-                return
+                errored = True
+                return errored
 
         emit_event("run_end", {"status": "ok"})
+        return errored
     finally:
         fw._current_cell_id = None
         if installed_runner_emitter:
             fw._active_emitter = old_emitter
+        if installed_proxies:
+            sys.stdout = old_stdout
+            sys.stderr = old_stderr
