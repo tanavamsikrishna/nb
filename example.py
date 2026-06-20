@@ -29,7 +29,6 @@ def func():
 # %% Imports
 import datetime
 import time
-import warnings
 from datetime import date
 
 import plotly.express as px
@@ -148,11 +147,14 @@ df = pl.DataFrame({"x": ["A", "B", "C"], "y": [10, 20, 15]})
 fig = px.bar(df, x="x", y="y", title="Sample Bar Chart")
 display(fig)
 
-# %% Doing something nasty
 
-warnings.warn("About to call an non-existent function")
+# %% Defining something nasty
 
-displayx("## Date / time types", as_="md")
 
-# %% Display a table
-display(pl.concat([df] * 10))
+def wrong_func():
+    displayx("oops")
+
+
+# %% Calling the nasty
+
+wrong_func()

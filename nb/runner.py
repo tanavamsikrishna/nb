@@ -158,17 +158,39 @@ def parse_notebook(source: str) -> Tuple[str | None, List[Cell]]:
     return docstring, cells
 
 
+def _cell_for_line(cells: List["Cell"], line: int) -> "Cell":
+    """The cell that owns `line`: the last cell whose `# %%` header line
+    (`source_line - 1`) is at or before `line`. Forgiving of a cursor sitting on
+    the header line or anywhere in the body. A line before the first cell maps to
+    the first cell."""
+    chosen = cells[0]
+    for cell in cells:
+        if cell.source_line - 1 <= line:
+            chosen = cell
+        else:
+            break
+    return chosen
+
+
 def run_notebook(
     path: Path,
     exec_ns: dict,
     emit_event: Callable[[str, dict], None],
     log_sink: LogSink | None = None,
+    target_lines: Tuple[int, int] | None = None,
 ) -> bool:
     """Execute the notebook at `path`. Returns True if a cell (or load) errored.
 
     `log_sink`, when provided, receives the notebook's stdout/stderr and full
     tracebacks (raw passthrough for the `nb run` terminal); the browser gets
     only a brief error notice via the error `cell_end` event.
+
+    `target_lines`, when given as `(start, end)`, restricts execution to the
+    contiguous range of cells owning those lines (a single cell when both land in
+    the same one) — a *partial* run against the supplied (persisted) namespace.
+    Partial runs skip the `notebook_header` event and tag `run_start` with
+    `partial: True` so neither the daemon's state model nor the frontend treats
+    the shortened manifest as the whole notebook.
     """
     # Cache invalidation happens in the daemon before this runs (see handle_ipc_client),
     # so the cleared-cache report can be sent to the CLI before the notebook executes.
@@ -194,14 +216,29 @@ def run_notebook(
 
     docstring, cells = parse_notebook(source)
 
-    # Always emit, even without a docstring, so the frontend receives the path.
-    header_data: dict = {"path": str(path)}
-    if docstring is not None:
-        header_data["docstring"] = docstring
-    emit_event("notebook_header", header_data)
+    partial = target_lines is not None
+    if partial:
+        # Map both endpoints to cells and keep the inclusive index range between
+        # them (cell.id == position after renumbering, so slicing by id works).
+        lo, hi = sorted(
+            (_cell_for_line(cells, target_lines[0]).id, _cell_for_line(cells, target_lines[1]).id)
+        )
+        cells = cells[lo : hi + 1]
+
+    # A partial run leaves the notebook header untouched (path/docstring haven't
+    # changed); emitting it would reset the daemon's notebook_state. A full run
+    # always emits, even without a docstring, so the frontend receives the path.
+    if not partial:
+        header_data: dict = {"path": str(path)}
+        if docstring is not None:
+            header_data["docstring"] = docstring
+        emit_event("notebook_header", header_data)
 
     cell_manifest = [{"id": cell.id, "title": cell.title} for cell in cells]
-    emit_event("run_start", {"cell_manifest": cell_manifest})
+    run_start_data: dict = {"cell_manifest": cell_manifest}
+    if partial:
+        run_start_data["partial"] = True
+    emit_event("run_start", run_start_data)
 
     exec_ns.setdefault("__name__", "__main__")
     exec_ns.setdefault("__builtins__", __builtins__)

@@ -15,18 +15,161 @@ from nb import runner
 active_clients: Set[asyncio.Queue] = set()
 run_lock = asyncio.Lock()
 
-# Buffer of the most recent run's events, replayed to clients that connect (or
-# refresh) after the run. Without it, a freshly-opened browser shows a blank
-# page until the next run, since /stream is otherwise live-only. Reset at the
-# start of each run ("notebook_header" is always the first event runner emits).
-last_run_events: list[dict] = []
+# Persistent exec namespaces, keyed by resolved notebook path. A full `nb run`
+# stores a fresh namespace here before executing; a partial re-run (`nb run
+# file.py:42`) reuses it so the targeted cells see the state the last full run
+# left behind. Lives in the daemon's long-lived process (like `fw._cache`), not
+# the per-run exec scope, so it survives across runs.
+_exec_namespaces: dict[str, dict] = {}
+
+# Authoritative render state of the notebook — what a freshly-connected browser
+# tab must display, not a log of past events. State-bearing events fold into
+# this (see `_fold_state`); transient events (run_end, future scroll/toast) only
+# fan out live. A new client gets a snapshot regenerated from this state
+# (`_snapshot_events`), so partial re-runs need no event-log splicing.
+notebook_state: dict = {"path": None, "docstring": None, "cells": []}
+
+
+def _state_find_cell(cell_id: int) -> dict | None:
+    for cell in notebook_state["cells"]:
+        if cell["id"] == cell_id:
+            return cell
+    return None
+
+
+def _new_cell_state(cell_id: int, title: str | None = None) -> dict:
+    return {
+        "id": cell_id,
+        "title": title,
+        "source_line": None,
+        "status": "pending",
+        "stale": False,
+        "profiling": None,
+        "records": [],
+    }
+
+
+def _fold_state(event_type: str, data: dict) -> None:
+    """Update `notebook_state` from a state-bearing event. No-op for transient
+    events (run_end and any future scroll/toast/collapse), which are live-only."""
+    if event_type == "notebook_header":
+        notebook_state["path"] = data.get("path")
+        notebook_state["docstring"] = data.get("docstring")
+    elif event_type == "run_start":
+        manifest = data.get("cell_manifest", [])
+        if data.get("partial"):
+            # Mark only the targeted cells stale/pending; leave the rest exactly
+            # as they are (their output stays visible across the partial re-run).
+            for item in manifest:
+                cell = _state_find_cell(item["id"])
+                if cell is None:
+                    cell = _new_cell_state(item["id"], item.get("title"))
+                    notebook_state["cells"].append(cell)
+                cell["title"] = item.get("title", cell["title"])
+                cell["stale"] = True
+                cell["status"] = "pending"
+            notebook_state["cells"].sort(key=lambda c: c["id"])
+        else:
+            # Full run: rebuild the cell list to the manifest, preserving the
+            # records of surviving ids and dropping absent ones (mirrors the
+            # frontend reconcile + finalizeRun, resolved immediately).
+            existing = {c["id"]: c for c in notebook_state["cells"]}
+            rebuilt = []
+            for item in manifest:
+                cell = existing.get(item["id"])
+                if cell is None:
+                    cell = _new_cell_state(item["id"], item.get("title"))
+                else:
+                    cell["title"] = item.get("title", cell["title"])
+                    cell["stale"] = True
+                    cell["status"] = "pending"
+                rebuilt.append(cell)
+            rebuilt.sort(key=lambda c: c["id"])
+            notebook_state["cells"] = rebuilt
+    elif event_type == "cell_start":
+        cell = _state_find_cell(data["cell_id"])
+        if cell is None:
+            cell = _new_cell_state(data["cell_id"], data.get("title"))
+            notebook_state["cells"].append(cell)
+            notebook_state["cells"].sort(key=lambda c: c["id"])
+        cell["status"] = "running"
+        cell["stale"] = False
+        cell["title"] = data.get("title", cell["title"])
+        cell["source_line"] = data.get("source_line", cell["source_line"])
+        cell["profiling"] = None
+        cell["records"] = []  # fresh records buffer; display_records append below
+    elif event_type == "display_record":
+        cell = _state_find_cell(data["cell_id"])
+        if cell is not None:
+            cell["records"].append({"type": data["type"], "payload": data["payload"]})
+    elif event_type == "cell_end":
+        cell = _state_find_cell(data["cell_id"])
+        if cell is not None:
+            cell["status"] = data.get("status")
+            cell["profiling"] = {"wall_ms": data.get("wall_ms"), "cpu_ms": data.get("cpu_ms")}
+
+
+def _snapshot_events() -> list[dict]:
+    """Regenerate the canonical event sequence that reproduces `notebook_state`
+    in a freshly-connected client. The frontend's live-event handlers hydrate the
+    store identically, so there is a single renderer path (live or snapshot)."""
+    if notebook_state["path"] is None and not notebook_state["cells"]:
+        return []
+
+    events: list[dict] = []
+    header: dict = {"path": notebook_state["path"]}
+    if notebook_state["docstring"] is not None:
+        header["docstring"] = notebook_state["docstring"]
+    events.append({"event": "notebook_header", "data": header})
+
+    manifest = [{"id": c["id"], "title": c["title"] or ""} for c in notebook_state["cells"]]
+    events.append({"event": "run_start", "data": {"cell_manifest": manifest, "partial": False}})
+
+    for cell in notebook_state["cells"]:
+        events.append(
+            {
+                "event": "cell_start",
+                "data": {
+                    "cell_id": cell["id"],
+                    "source_line": cell["source_line"],
+                    "title": cell["title"] or "",
+                },
+            }
+        )
+        for record in cell["records"]:
+            events.append(
+                {
+                    "event": "display_record",
+                    "data": {
+                        "cell_id": cell["id"],
+                        "type": record["type"],
+                        "payload": record["payload"],
+                    },
+                }
+            )
+        profiling = cell["profiling"] or {}
+        # Coerce a non-terminal status (a cell still running/pending when the
+        # client connected) to "ok"; the subsequent live events correct it.
+        status = cell["status"] if cell["status"] in ("ok", "error") else "ok"
+        events.append(
+            {
+                "event": "cell_end",
+                "data": {
+                    "cell_id": cell["id"],
+                    "wall_ms": profiling.get("wall_ms", 0),
+                    "cpu_ms": profiling.get("cpu_ms", 0),
+                    "status": status,
+                },
+            }
+        )
+    return events
 
 
 def emit_event(event_type: str, event_data: dict) -> None:
     event = {"event": event_type, "data": event_data}
-    if event_type == "notebook_header":
-        last_run_events.clear()
-    last_run_events.append(event)
+    # Fold state-bearing events into notebook_state; transient ones are no-ops
+    # there (live fan-out below still delivers them to connected clients).
+    _fold_state(event_type, event_data)
     for queue in list(active_clients):
         queue.put_nowait(event)
 
@@ -44,11 +187,11 @@ async def stream_handler(request: web.Request) -> web.StreamResponse:
     response.headers["Access-Control-Allow-Origin"] = "*"
     await response.prepare(request)
 
-    # Snapshot the last run and subscribe with no await in between, so the
-    # single-threaded event loop can't slip a live event past us: anything
+    # Snapshot current notebook state and subscribe with no await in between, so
+    # the single-threaded event loop can't slip a live event past us: anything
     # emitted after this point lands on the queue, never duplicating the
     # snapshot. (emit_event also runs on this loop thread.)
-    buffered = list(last_run_events)
+    buffered = _snapshot_events()
     queue = asyncio.Queue()
     active_clients.add(queue)
     try:
@@ -88,6 +231,7 @@ async def handle_ipc_client(reader: asyncio.StreamReader, writer: asyncio.Stream
             notebook_path = Path(req["path"])
             clear_cache_names = req.get("clear_cache")
             clear_cache_all = req.get("clear_cache_all", False)
+            lines = req.get("lines")  # [start, end] for a partial re-run, else None
 
             loop = asyncio.get_running_loop()
 
@@ -137,12 +281,25 @@ async def handle_ipc_client(reader: asyncio.StreamReader, writer: asyncio.Stream
                     )
                     await writer.drain()
 
-                exec_ns = {
-                    "__name__": "__main__",
-                    "__builtins__": __builtins__,
-                    "display": fw.display,
-                    "nb_cache": fw.nb_cache,
-                }
+                # Resolve the namespace and run mode. A partial re-run reuses the
+                # namespace the last full run saved; if none exists (daemon just
+                # started, or this notebook hasn't run yet), fall back to a full
+                # run, which seeds it — so the command always works.
+                ns_key = str(notebook_path)
+                target_lines: tuple[int, int] | None = None
+                if lines is not None and ns_key in _exec_namespaces:
+                    exec_ns = _exec_namespaces[ns_key]
+                    target_lines = (int(lines[0]), int(lines[1]))
+                else:
+                    if lines is not None:
+                        cli_log("stdout", "No saved state for this notebook; running it in full.\n")
+                    exec_ns = {
+                        "__name__": "__main__",
+                        "__builtins__": __builtins__,
+                        "display": fw.display,
+                        "nb_cache": fw.nb_cache,
+                    }
+                    _exec_namespaces[ns_key] = exec_ns
 
                 # Execute notebook in separate thread so exec doesn't block the main event loop
                 errored = await loop.run_in_executor(
@@ -152,6 +309,7 @@ async def handle_ipc_client(reader: asyncio.StreamReader, writer: asyncio.Stream
                     exec_ns,
                     thread_safe_emit_event,
                     cli_log,
+                    target_lines,
                 )
 
                 # Reply reflects the run outcome so `nb run` exits non-zero on a

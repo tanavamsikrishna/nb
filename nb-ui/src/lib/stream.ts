@@ -46,7 +46,12 @@ export function connectStream() {
     // A fresh run clears the previous error banner; this is the only place it
     // is cleared, which is what keeps it sticky across run_end.
     runError.set(null);
-    reconcile(data.cell_manifest);
+    // A partial run targets only the cells in the manifest; skipping reconcile
+    // leaves every other cell (and its output) untouched. Each targeted cell is
+    // updated in place by its own cell_start / display_record / cell_end events.
+    if (!data.partial) {
+      reconcile(data.cell_manifest);
+    }
   });
 
   eventSource.addEventListener("cell_start", (e) => {

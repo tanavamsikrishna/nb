@@ -91,6 +91,12 @@ export interface NotebookHeaderEvent {
 
 export interface RunStartEvent {
   cell_manifest: CellManifestItem[];
+  /**
+   * A partial run re-executes only the cells in `cell_manifest` (a single cell
+   * or a contiguous range) against the daemon's saved namespace. The frontend
+   * skips reconcile so cells outside the manifest keep their output untouched.
+   */
+  partial?: boolean;
 }
 
 export interface CellStartEvent {
