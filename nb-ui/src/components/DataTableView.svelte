@@ -506,6 +506,11 @@
     font-size: 0.75rem;
     color: var(--fg-secondary);
     padding-top: 6px;
-    text-align: right;
+    text-align: left;
+    /* Hug the table's width so the status reads directly under the table's
+       left edge rather than drifting to the far right of the full-width
+       wrapper. */
+    width: fit-content;
+    max-width: 100%;
   }
 </style>
