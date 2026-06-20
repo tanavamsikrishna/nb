@@ -77,6 +77,20 @@ export interface RunError {
 
 export type ConnectionStatus = "connecting" | "connected" | "disconnected";
 
+/* ── /notebooks (index page picker; see nb/daemon.py notebooks_handler) ── */
+
+export interface NotebookListItem {
+  /** Resolved absolute path — the session key and the `?path=` value. */
+  path: string;
+  /** Basename, for display. */
+  name: string;
+  num_cells: number;
+}
+
+export interface NotebooksResponse {
+  notebooks: NotebookListItem[];
+}
+
 /* ── SSE event payloads (the `data` field of each event; see nb/runner.py) ── */
 
 export interface CellManifestItem {

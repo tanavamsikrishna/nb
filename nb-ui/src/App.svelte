@@ -30,18 +30,32 @@
   import NotebookHeader from "./components/NotebookHeader.svelte";
   import Cell from "./components/Cell.svelte";
   import RunSummary from "./components/RunSummary.svelte";
+  import NotebookList from "./components/NotebookList.svelte";
+
+  // The view is selected by the `?path=` query param: absent → the index list of
+  // notebooks; present → that notebook's live stream. Navigation between them is a
+  // full-page load, so each notebook view is a fresh SPA bound to one path.
+  const path = new URLSearchParams(window.location.search).get("path");
 
   onMount(() => {
-    connectStream();
+    if (path) {
+      // Show the path in the header immediately, before the first event arrives.
+      notebookPath.set(path);
+      connectStream(path);
+    }
   });
 </script>
+
+{#if !path}
+  <NotebookList />
+{:else}
 
 <div class="app-wrapper">
   <!-- Top Navigation Bar -->
   <header class="app-header">
     <div class="header-content">
       <div class="logo-area">
-        <span class="logo-nb">nb</span>
+        <a class="logo-nb logo-home" href="/" title="All notebooks">nb</a>
         <span class="logo-separator">/</span>
         <span class="logo-sub">notebook stream</span>
         {#if $notebookPath}
@@ -136,6 +150,7 @@
     {/if}
   </main>
 </div>
+{/if}
 
 <style>
   :global(body) {
@@ -188,6 +203,12 @@
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     letter-spacing: -0.05em;
+  }
+
+  /* The "nb" logo doubles as a link back to the notebook index. */
+  .logo-home {
+    text-decoration: none;
+    cursor: pointer;
   }
 
   .logo-separator {

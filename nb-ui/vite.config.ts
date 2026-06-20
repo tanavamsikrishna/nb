@@ -20,6 +20,7 @@ export default defineConfig({
   server: {
     proxy: {
       "/stream": "http://localhost:7777",
+      "/notebooks": "http://localhost:7777",
     },
   },
 });

@@ -21,13 +21,15 @@ getDb();
 
 let eventSource: EventSource | null = null;
 
-export function connectStream() {
+export function connectStream(path: string) {
   if (eventSource) {
     eventSource.close();
   }
 
   connectionStatus.set("connecting");
-  eventSource = new EventSource("/stream");
+  // The path identifies which notebook's stream to subscribe to; the daemon
+  // keeps per-notebook state keyed by this exact (resolved) path.
+  eventSource = new EventSource("/stream?path=" + encodeURIComponent(path));
 
   eventSource.onopen = () => {
     connectionStatus.set("connected");
