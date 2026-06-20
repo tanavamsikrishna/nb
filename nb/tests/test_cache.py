@@ -165,6 +165,86 @@ def test_nb_cache_captures_and_replays_display() -> None:
         fw._active_emitter = old_emitter
 
 
+def test_nb_cache_captures_nested_non_cached_helper_display() -> None:
+    # A cached function's output must be identical whether produced fresh or
+    # replayed from cache — including display() calls made by non-cached helpers
+    # it invokes. On a hit the helper never runs, so its records must have been
+    # captured into the entry on the original miss.
+    clear_all_cache()
+    emitted: list[DisplayRecord] = []
+    old_emitter = fw._active_emitter
+    fw._active_emitter = emitted.append
+
+    try:
+
+        def helper(name: str) -> None:
+            display(f"helper {name}", as_="md")
+
+        @nb_cache
+        def top(name: str) -> str:
+            display(f"top {name}", as_="md")
+            helper(name)
+            return name
+
+        expected = [
+            DisplayRecord(type="md", payload="top a"),
+            DisplayRecord(type="md", payload="helper a"),
+        ]
+
+        assert top("a") == "a"
+        assert emitted == expected
+
+        emitted.clear()
+        assert top("a") == "a"  # cache hit; helper does not run
+        assert emitted == expected
+    finally:
+        fw._active_emitter = old_emitter
+
+
+def test_nb_cache_nested_cache_display_bubbles_to_outer() -> None:
+    # Records displayed by a nested cached call must bubble into the outer call's
+    # entry, so the outer hit reproduces them even though the inner call is skipped.
+    clear_all_cache()
+    emitted: list[DisplayRecord] = []
+    old_emitter = fw._active_emitter
+    fw._active_emitter = emitted.append
+
+    try:
+
+        @nb_cache
+        def inner(name: str) -> str:
+            display(f"inner {name}", as_="md")
+            return name.upper()
+
+        @nb_cache
+        def outer(name: str) -> str:
+            display(f"outer {name}", as_="md")
+            return inner(name)
+
+        expected = [
+            DisplayRecord(type="md", payload="outer a"),
+            DisplayRecord(type="md", payload="inner a"),
+        ]
+
+        assert outer("a") == "A"
+        assert emitted == expected
+
+        # Clear only outer: re-running it is a miss while inner is a hit. Inner's
+        # replayed record must reach the stream *and* be recorded into outer's new
+        # entry (proving replay flows through the enclosing capture sink).
+        emitted.clear()
+        clear_cache_by_name(["outer"])
+        assert outer("a") == "A"
+        assert emitted == expected
+
+        # Now outer is a full hit: both records replay from its own entry.
+        emitted.clear()
+        assert outer("a") == "A"
+        assert emitted == expected
+    finally:
+        fw._active_emitter = old_emitter
+
+
 def test_nb_cache_keys() -> None:
     clear_all_cache()
 

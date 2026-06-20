@@ -3,9 +3,11 @@ import hashlib
 import json
 import pickle
 import types
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
 from functools import wraps
-from typing import Any, Callable, Literal, TypeVar, cast, overload
+from typing import Any, Callable, Generator, Literal, TypeVar, cast, overload
 
 F = TypeVar("F", bound=Callable)
 
@@ -34,6 +36,32 @@ _current_cell_id: int | None = None
 def _emit(record: DisplayRecord) -> None:
     if _active_emitter is not None:
         _active_emitter(record)
+
+
+# Where display records currently flow. At the top level it is the live stream
+# (_emit); inside an @nb_cache call it is a capturing sink that appends the record
+# to that call's frame *and*, by delegating to its parent, to every enclosing
+# cache frame — before reaching _emit exactly once. So a record displayed at any
+# depth lands in every ancestor's cache entry, making a cache hit reproduce a
+# fresh run's output at every nesting level. ContextVar (not a plain global) keeps
+# this correct under the daemon's executor thread and auto-restores via the token.
+_sink: ContextVar[Callable[[DisplayRecord], None]] = ContextVar("_sink", default=_emit)
+
+
+@contextmanager
+def _capture_into(frame: list[DisplayRecord]) -> Generator[None, None, None]:
+    """Route display records into ``frame`` (and all ancestor frames) for the block."""
+    parent = _sink.get()
+
+    def sink(record: DisplayRecord) -> None:
+        frame.append(record)
+        parent(record)
+
+    token = _sink.set(sink)
+    try:
+        yield
+    finally:
+        _sink.reset(token)
 
 
 def _serialize_table(df: Any, label: str | None = None) -> dict:
@@ -135,7 +163,7 @@ def display(
     as_: Literal["md", "html", "text", "object", "table"] | None = None,
     label: str | None = None,
 ) -> None:
-    _emit(_create_display_record(obj, as_, label=label))
+    _sink.get()(_create_display_record(obj, as_, label=label))
 
 
 def _code_fingerprint(code: types.CodeType) -> bytes:
@@ -267,50 +295,24 @@ def nb_cache(func: F | None = None, *, keys: list[str] | None = None) -> F | Cal
     def decorator(func: F) -> F:
         _check_purity(func.__code__, func.__name__)
 
-        _capture_stack: list[list[DisplayRecord]] = []
-
-        def nb_display(
-            obj: Any,
-            *,
-            as_: str | None = None,
-            label: str | None = None,
-        ) -> None:
-            record = _create_display_record(obj, as_, label=label)
-            if _capture_stack:
-                _capture_stack[-1].append(record)
-            _emit(record)
-
-        new_globals = func.__globals__.copy()
-        new_globals["display"] = nb_display
-
-        new_func = types.FunctionType(
-            func.__code__, new_globals, func.__name__, func.__defaults__, func.__closure__
-        )
-
         @wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
-            # new_globals is a frozen copy taken at decoration time (with our
-            # capturing display swapped in); refresh it from the live notebook
-            # globals each call so the function sees current values, never
-            # overwriting our display.
-            for k, v in func.__globals__.items():
-                if k != "display":
-                    new_globals[k] = v
-
-            cache_key = compute_key(new_func, args, kwargs, keys)
+            cache_key = compute_key(func, args, kwargs, keys)
 
             if cache_key in _cache:
                 entry = _cache[cache_key]
+                # Replay through the *current* sink, not _emit directly: a nested
+                # hit must feed its records into the enclosing cache frame(s) too,
+                # so an outer entry built while this call was a hit still records
+                # (and later replays) what this call produced.
+                sink = _sink.get()
                 for record in entry.display_records:
-                    _emit(record)
+                    sink(record)
                 return entry.result
 
             records: list[DisplayRecord] = []
-            _capture_stack.append(records)
-            try:
-                result = new_func(*args, **kwargs)
-            finally:
-                _capture_stack.pop()
+            with _capture_into(records):
+                result = func(*args, **kwargs)
 
             _cache[cache_key] = CacheEntry(
                 result=result,
