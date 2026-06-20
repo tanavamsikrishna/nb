@@ -141,7 +141,7 @@ def _fold_state(event_type: str, data: dict, path: str) -> None:
         cell["title"] = data.get("title", cell["title"])
         cell["source_line"] = data.get("source_line", cell["source_line"])
         cell["profiling"] = None
-        cell["records"] = []  # fresh records buffer; display_records append below
+        cell["records"] = []
     elif event_type == "display_record":
         cell = _state_find_cell(cells, data["cell_id"])
         if cell is not None:

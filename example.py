@@ -45,7 +45,6 @@ for _ in range(2):
     display("show something")
 
 display("## Sample numpy", as_="md")
-# Generate mock sample data
 df = pl.DataFrame(
     {
         "id": [1, 2, 3, 4, 5],

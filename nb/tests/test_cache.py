@@ -128,11 +128,9 @@ def test_nb_cache_decorator() -> None:
     assert add(2, 3) == 5
     assert call_count == 1
 
-    # Second call must be a cache hit
     assert add(2, 3) == 5
     assert call_count == 1
 
-    # Different inputs must cause cache miss
     assert add(2, 4) == 6
     assert call_count == 2
 
@@ -248,7 +246,6 @@ def test_nb_cache_nested_cache_display_bubbles_to_outer() -> None:
 def test_nb_cache_keys() -> None:
     clear_all_cache()
 
-    # Establish globals in the module level for testing
     global WINDOW
     WINDOW = 5
     call_count = 0
@@ -262,7 +259,6 @@ def test_nb_cache_keys() -> None:
     assert get_windowed_value(10) == 15
     assert call_count == 1
 
-    # Cache hit
     assert get_windowed_value(10) == 15
     assert call_count == 1
 
