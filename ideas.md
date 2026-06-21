@@ -1,0 +1,1 @@
+- Can purity linter be extended to flag free variable modifications?
