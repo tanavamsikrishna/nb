@@ -44,6 +44,16 @@ for _ in range(2):
     time.sleep(1)
     display("show something")
 
+display(
+    """
+# Todos
+
+- [ ] Todo1
+- [ ] Todo2
+""",
+    as_="md",
+)
+
 display("## Sample numpy", as_="md")
 df = pl.DataFrame(
     {
