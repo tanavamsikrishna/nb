@@ -2,8 +2,8 @@
 name: nb
 description: >-
   Use when writing or editing notebooks for the `nb` framework in this project.
-  Covers cell structure, all display types, @nb_cache caching decorator, and the
-  CLI workflow for running notebooks.
+  Covers cell structure, the run/query/cache CLI workflow, and points to guide.py
+  for the full display and @nb_cache API.
 ---
 
 # nb — Python Notebook Framework
@@ -39,6 +39,9 @@ uv run nb daemon .
 uv run nb run <notebook.py>
 ```
 
+All `run`/`query` commands need the daemon; for pure authoring you only need
+`skills/nb/guide.py` and the cell-structure rules above.
+
 ## Querying State (for agents)
 
 `nb query` reads the daemon's saved state for a notebook that has already run — a
@@ -60,6 +63,9 @@ uv run nb query exec <notebook.py> -c "CODE"   # run Python against the notebook
   runs — same as a Jupyter kernel). It prints captured stdout/stderr, renders any
   `display(...)` calls the same way `records` does, and exits non-zero on an uncaught
   exception. Code may also be piped via stdin (omit `-c`).
+
+If a query errors with no daemon reply, start the daemon (`uv run nb daemon .`)
+and run the notebook once (`uv run nb run <notebook.py>`) before querying.
 
 ## Cache Management
 
