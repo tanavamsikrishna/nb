@@ -312,6 +312,160 @@ async def test_partial_rerun_reuses_saved_namespace(tmp_path: Path) -> None:
         shutil.rmtree(project_dir, ignore_errors=True)
 
 
+async def _query_request(socket_path: Path, req: dict) -> dict:
+    """Send a `command: query` request and return the single JSON reply."""
+    reader, writer = await asyncio.open_unix_connection(str(socket_path))
+    writer.write(json.dumps({"command": "query", **req}).encode("utf-8") + b"\n")
+    await writer.drain()
+    line = await reader.readline()
+    writer.close()
+    await writer.wait_closed()
+    return json.loads(line.decode("utf-8"))
+
+
+@pytest.mark.asyncio
+async def test_query_cells_records_and_exec(tmp_path: Path) -> None:
+    """`nb query` exposes a run's saved state: the cell list, a cell's display
+    records (small tables/plots inline, large ones spilled to a file), and
+    arbitrary code run against the live, persistent namespace."""
+    project_dir = Path(tempfile.mkdtemp(prefix="nb-test-", dir="/private/tmp"))
+    socket_path = project_dir / ".nb.sock"
+    port = unused_tcp_port()
+    daemon.STATIC_DIR = tmp_path
+    daemon._sessions.clear()
+
+    task = asyncio.create_task(daemon.main(project_dir, host="127.0.0.1", port=port))
+    for _ in range(30):
+        if socket_path.exists():
+            break
+        await asyncio.sleep(0.1)
+    assert socket_path.exists()
+
+    try:
+        import polars as pl
+
+        nb_path = tmp_path / "q.py"
+        nb_path.write_text(
+            "# %% intro\n"
+            'display("hello")\n'
+            "# %% data\n"
+            "import polars as pl\n"
+            'display(pl.DataFrame({"a": [1, 2, 3]}))\n'
+            "# %% big\n"
+            'display(pl.DataFrame({"n": list(range(5000))}))\n'
+            "# %% plot\n"
+            "import plotly.graph_objects as go\n"
+            "display(go.Figure(go.Scatter(x=list(range(2000)), y=list(range(2000)))))\n"
+            "# %% state\n"
+            "x = 41\n"
+        )
+        run = await _run_request(socket_path, {"path": str(nb_path)})
+        assert run["terminal"]["status"] == "ok"
+
+        # cells: titles preserved, statuses ok, record counts, and a start line
+        # for each (the `# %%` header line).
+        cells = await _query_request(socket_path, {"op": "cells", "path": str(nb_path)})
+        assert cells["status"] == "ok"
+        assert cells["count"] == 5
+        by_title = {c["title"]: c for c in cells["cells"]}
+        assert set(by_title) == {"intro", "data", "big", "plot", "state"}
+        assert by_title["data"]["records"] == 1
+        assert by_title["state"]["records"] == 0
+        assert all(c["status"] == "ok" for c in cells["cells"])
+        assert by_title["intro"]["start_line"] == 1
+
+        # records: the text cell returns its content inline.
+        intro_id = by_title["intro"]["id"]
+        recs = await _query_request(
+            socket_path, {"op": "records", "path": str(nb_path), "cell": intro_id}
+        )
+        assert recs["status"] == "ok"
+        assert recs["records"] == [{"type": "text", "content": "hello"}]
+
+        # records: a small table fits in the preview — schema + full CSV, no file.
+        recs = await _query_request(
+            socket_path, {"op": "records", "path": str(nb_path), "cell": by_title["data"]["id"]}
+        )
+        table = recs["records"][0]
+        assert table["type"] == "table" and table["rows"] == 3 and "path" not in table
+        assert table["schema"] == {"a": "Int64"}
+        assert table["preview"] == "a\n1\n2\n3\n"
+
+        # records: a large table still previews inline (head) AND writes the full
+        # data to a CSV file — no information cliff.
+        recs = await _query_request(
+            socket_path, {"op": "records", "path": str(nb_path), "cell": by_title["big"]["id"]}
+        )
+        big = recs["records"][0]
+        assert big["type"] == "table" and big["rows"] == 5000
+        assert big["preview"].count("\n") == daemon._TABLE_PREVIEW_ROWS + 1  # header + N rows
+        assert big["path"].endswith(".csv")
+        assert pl.read_csv(big["path"]).height == 5000  # plain text: header + 5000 rows
+        Path(big["path"]).unlink()
+
+        # records: a plot is always spilled to a JSON file holding the figure spec.
+        recs = await _query_request(
+            socket_path, {"op": "records", "path": str(nb_path), "cell": by_title["plot"]["id"]}
+        )
+        plot = recs["records"][0]
+        assert plot["type"] == "plotly" and "content" not in plot
+        assert "data" in json.loads(Path(plot["path"]).read_text())
+        Path(plot["path"]).unlink()
+
+        # records: unknown cell id is a clean error listing the valid ids.
+        bad = await _query_request(
+            socket_path, {"op": "records", "path": str(nb_path), "cell": 999}
+        )
+        assert bad["status"] == "error" and "Available cells" in bad["message"]
+
+        # exec: runs against the live namespace — sees x = 41, and a mutation
+        # persists to the next exec (it is the same kernel).
+        out = await _query_request(
+            socket_path, {"op": "exec", "path": str(nb_path), "code": "print(x)"}
+        )
+        assert out["status"] == "ok" and out["stdout"] == "41\n" and out["exception"] is None
+
+        await _query_request(socket_path, {"op": "exec", "path": str(nb_path), "code": "x = 100"})
+        out = await _query_request(
+            socket_path, {"op": "exec", "path": str(nb_path), "code": "print(x)"}
+        )
+        assert out["stdout"] == "100\n"
+
+        # exec: display(...) calls are captured into the reply (same rendering as
+        # `records` — small table inlined as CSV here) rather than no-oping.
+        out = await _query_request(
+            socket_path,
+            {
+                "op": "exec",
+                "path": str(nb_path),
+                "code": 'display("captured")\ndisplay(pl.DataFrame({"b": [9, 8]}))',
+            },
+        )
+        assert out["records"][0] == {"type": "text", "content": "captured"}
+        table = out["records"][1]
+        assert table["type"] == "table" and table["rows"] == 2 and "path" not in table
+        assert table["schema"] == {"b": "Int64"} and table["preview"] == "b\n9\n8\n"
+
+        # exec: an error is captured as a traceback, not a daemon crash.
+        out = await _query_request(
+            socket_path, {"op": "exec", "path": str(nb_path), "code": "1 / 0"}
+        )
+        assert out["exception"] is not None and "ZeroDivisionError" in out["exception"]
+
+        # Every op errors cleanly for a notebook that was never run.
+        never = tmp_path / "never.py"
+        never.write_text("# %%\npass\n")
+        miss = await _query_request(socket_path, {"op": "cells", "path": str(never)})
+        assert miss["status"] == "error" and "has not been run" in miss["message"]
+    finally:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+        shutil.rmtree(project_dir, ignore_errors=True)
+
+
 @pytest.mark.asyncio
 async def test_notebooks_listing_and_path_scoped_stream(tmp_path: Path) -> None:
     """`/notebooks` lists every notebook with a session; `/stream?path=` serves

@@ -1,8 +1,13 @@
 import asyncio
+import base64
+import contextlib
+import io
 import json
 import os
 import re
 import signal
+import tempfile
+import traceback
 import webbrowser
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -68,7 +73,7 @@ def _fresh_exec_ns() -> dict:
     }
 
 
-def _state_find_cell(cells: list[dict], cell_id: int) -> dict | None:
+def _state_find_cell(cells: list[dict], cell_id: int | None) -> dict | None:
     for cell in cells:
         if cell["id"] == cell_id:
             return cell
@@ -309,6 +314,176 @@ async def index_handler(request: web.Request) -> web.FileResponse | web.Response
     return web.FileResponse(index_file)
 
 
+def _query_cells(session: NotebookSession) -> dict:
+    """Summarize a notebook's cells: title, line span, run status, record count.
+
+    A cell spans from its `# %%` header line through the line before the next
+    cell's header; the last cell runs to EOF (read from the file). `source_line`
+    is the first content line (header + 1), so the header is `source_line - 1` —
+    matching the line `nb run file.py:LINE` resolves to this cell. It can be None
+    for a pending cell (never started a run); its span is then reported as null."""
+    cells = session.cells
+    try:
+        total_lines = len(Path(session.path).read_text(encoding="utf-8").splitlines())
+    except OSError:
+        total_lines = None
+
+    # Header line of each cell (the `# %%` line), in order.
+    headers = [(c["source_line"] - 1) if c["source_line"] is not None else None for c in cells]
+    out = []
+    for i, cell in enumerate(cells):
+        start = headers[i]
+        end = None
+        if start is not None:
+            nxt = next((h for h in headers[i + 1 :] if h is not None), None)
+            end = (nxt - 1) if nxt is not None else total_lines
+        out.append(
+            {
+                "id": cell["id"],
+                "title": cell["title"],
+                "start_line": start,
+                "end_line": end,
+                "status": cell["status"],
+                "records": len(cell["records"]),
+            }
+        )
+    return {"status": "ok", "count": len(out), "cells": out}
+
+
+# How many leading rows of a table are inlined (as CSV) for a preview. The full
+# data is spilled to a CSV file only when the table has more rows than this, so a
+# reader always gets the schema and a preview, plus the complete data when there
+# is more of it.
+_TABLE_PREVIEW_ROWS = 50
+
+
+def _spill(session: NotebookSession, tag: str, n: int, suffix: str, data: bytes) -> str:
+    """Write `data` to a stable temp path and return it. The name is keyed by
+    notebook + tag + index (`c3` for a cell, `exec` for query exec), so
+    re-querying the same record overwrites its file instead of leaking a fresh
+    temp file on every call."""
+    stem = Path(session.path).stem
+    fpath = Path(tempfile.gettempdir()) / f"nb-query-{stem}-{tag}-{n}{suffix}"
+    fpath.write_bytes(data)
+    return str(fpath)
+
+
+def _render_record(record: dict, session: NotebookSession, tag: str, n: int) -> dict:
+    """Map one display record to a query-reply entry.
+
+    - table: always returns `schema` (column -> dtype) and a CSV `preview` of the
+      first `_TABLE_PREVIEW_ROWS` rows; when the table is larger, the full data is
+      also written to a CSV file and its `path` is returned. `schema` carries the
+      dtypes that CSV itself does not.
+    - plotly/altair: the spec is not human-readable, so it is always written to a
+      JSON file and only the `path` is returned.
+    - everything else (text/md/html/object): inlined as-is."""
+    rtype = record["type"]
+    payload = record["payload"]
+
+    if rtype == "table":
+        import polars as pl  # present in-process: a table record means polars made it
+
+        df = pl.read_parquet(io.BytesIO(base64.b64decode(payload["data"])))
+        total = payload.get("total_rows", df.height)
+        out = {
+            "type": "table",
+            "schema": {name: str(dtype) for name, dtype in zip(df.columns, df.dtypes)},
+            "rows": total,
+            "preview": df.head(_TABLE_PREVIEW_ROWS).write_csv(),
+            "label": payload.get("label"),
+        }
+        if total > _TABLE_PREVIEW_ROWS:  # the preview is a head(); spill the rest as CSV
+            out["path"] = _spill(session, tag, n, ".csv", df.write_csv().encode("utf-8"))
+        return out
+
+    if rtype in ("plotly", "altair"):
+        text = json.dumps(payload)
+        return {"type": rtype, "path": _spill(session, tag, n, ".json", text.encode("utf-8"))}
+
+    return {"type": rtype, "content": payload}
+
+
+def _query_records(session: NotebookSession, cell_id: int | None) -> dict:
+    cell = _state_find_cell(session.cells, cell_id)
+    if cell is None:
+        ids = [c["id"] for c in session.cells]
+        return {"status": "error", "message": f"No cell {cell_id}. Available cells: {ids}"}
+    cid = cell["id"]
+    records = [_render_record(r, session, f"c{cid}", n) for n, r in enumerate(cell["records"])]
+    return {"status": "ok", "cell": cid, "records": records}
+
+
+def _exec_in_ns(session: NotebookSession, code: str) -> dict:
+    """Exec `code` against the notebook's live namespace, capturing stdout/stderr,
+    any traceback, and any `display(...)` records (rendered like `query records`,
+    tables spilled to Parquet). Runs in an executor thread so it can't block the
+    event loop. A capturing emitter is installed for the call only; run_lock
+    guarantees no concurrent run is touching `fw._active_emitter`."""
+    out, err = io.StringIO(), io.StringIO()
+    exc: str | None = None
+    captured: list[fw.DisplayRecord] = []
+    old_emitter = fw._active_emitter
+    fw._active_emitter = captured.append
+    try:
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            try:
+                exec(compile(code, "<nb query exec>", "exec"), session.exec_ns)
+            except BaseException:
+                exc = traceback.format_exc()
+    finally:
+        fw._active_emitter = old_emitter
+    records = [
+        _render_record({"type": r.type, "payload": r.payload}, session, "exec", n)
+        for n, r in enumerate(captured)
+    ]
+    return {
+        "status": "ok",
+        "stdout": out.getvalue(),
+        "stderr": err.getvalue(),
+        "exception": exc,
+        "records": records,
+    }
+
+
+async def _handle_query(req: dict, writer: asyncio.StreamWriter) -> None:
+    """Serve a read-only `nb query` request against a notebook's saved session.
+
+    Replies with exactly one line-delimited JSON message. Queries run under the
+    same `run_lock` as runs (the caller holds it), so they never observe a
+    half-finished run. `exec` runs against the live `exec_ns` and may mutate it;
+    its `display(...)` calls are captured into the reply (not streamed to
+    browsers) by a temporary emitter (see `_exec_in_ns`)."""
+    path = str(Path(req["path"]))
+    session = _sessions.get(path)
+    if session is None:
+        reply: dict = {"status": "error", "message": f"Notebook {path} has not been run yet."}
+    else:
+        loop = asyncio.get_running_loop()
+        op = req.get("op")
+        if op == "cells":
+            reply = _query_cells(session)
+        elif op == "records":
+            # Rendering a table decodes Parquet and writes CSV to disk; run it off
+            # the event loop so a large table can't stall live SSE to browsers.
+            reply = await loop.run_in_executor(None, _query_records, session, req.get("cell"))
+        elif op == "exec":
+            if not session.exec_ns:
+                reply = {
+                    "status": "error",
+                    "message": "Notebook has no execution namespace yet; run it first.",
+                }
+            else:
+                reply = await loop.run_in_executor(
+                    None, _exec_in_ns, session, req.get("code", "")
+                )
+        else:
+            reply = {"status": "error", "message": f"Unknown query op: {op!r}."}
+
+    writer.write(json.dumps(reply).encode("utf-8") + b"\n")
+    await writer.drain()
+
+
 async def handle_ipc_client(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
     async with run_lock:
         try:
@@ -317,6 +492,14 @@ async def handle_ipc_client(reader: asyncio.StreamReader, writer: asyncio.Stream
                 return
 
             req = json.loads(line.decode("utf-8"))
+
+            # `command` defaults to "run" so the existing CLI protocol is
+            # unchanged. `query` is a read path for agents (see _handle_query):
+            # it reads the notebook's saved session state and replies once.
+            if req.get("command") == "query":
+                await _handle_query(req, writer)
+                return
+
             notebook_path = Path(req["path"])
             ns_key = str(notebook_path)  # session key + the path this run's events route to
             clear_cache_names = req.get("clear_cache")

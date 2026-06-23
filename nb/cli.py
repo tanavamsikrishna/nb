@@ -105,6 +105,38 @@ def _send_run(socket_path: Path, req: dict) -> bool:
         s.close()
 
 
+def _send_query(socket_path: Path, req: dict) -> dict:
+    """Send one query request and return the daemon's single JSON reply.
+
+    Raises _DaemonUnavailable if the daemon socket can't be reached."""
+    if not socket_path.exists():
+        raise _DaemonUnavailable()
+
+    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        s.connect(str(socket_path))
+    except (OSError, ConnectionRefusedError) as e:
+        # Leftover socket from a daemon that died; remove so the next start rebinds.
+        try:
+            socket_path.unlink()
+        except OSError:
+            pass
+        raise _DaemonUnavailable() from e
+
+    try:
+        s.sendall(json.dumps(req).encode("utf-8") + b"\n")
+        line = s.makefile("r", encoding="utf-8").readline()
+        if not line:
+            return {"status": "error", "message": "Daemon closed connection without response."}
+        return json.loads(line)
+    except (OSError, ValueError) as e:
+        # Broken pipe mid-send, or a truncated/garbled reply line: surface as a
+        # clean error rather than letting the traceback escape to the user.
+        return {"status": "error", "message": f"Error communicating with daemon: {e}"}
+    finally:
+        s.close()
+
+
 @click.group()
 def main() -> None:
     pass
@@ -154,12 +186,7 @@ def run(
     path_str, suffix = _split_line_suffix(notebook)
     spec = lines_opt if lines_opt is not None else suffix
 
-    notebook_path = Path(path_str)
-    if not notebook_path.is_file():
-        click.echo(f"Notebook not found: {path_str}", err=True)
-        sys.exit(1)
-    notebook_path = notebook_path.resolve()
-    socket_path = Path.cwd() / ".nb.sock"
+    notebook_path, socket_path = _resolve_notebook_target(path_str)
 
     if clear_cache_all and clear_cache is not None:
         click.echo("Use either --clear-cache or --clear-cache-all, not both.", err=True)
@@ -231,6 +258,121 @@ def _report_cache(cache: dict) -> None:
 @click.argument("project_dir", type=click.Path(exists=True, file_okay=False, path_type=Path))
 def start_daemon(project_dir: Path) -> None:
     daemon.start_daemon(project_dir.resolve())
+
+
+def _resolve_notebook_target(notebook: str) -> tuple[Path, Path]:
+    """Resolve a notebook path to its absolute form and locate the project's
+    daemon socket. Exits with a message if the notebook file is missing."""
+    p = Path(notebook)
+    if not p.is_file():
+        click.echo(f"Notebook not found: {notebook}", err=True)
+        sys.exit(1)
+    return p.resolve(), Path.cwd() / ".nb.sock"
+
+
+def _query(req: dict, socket_path: Path) -> dict:
+    """Send a query, mapping a missing daemon or an error reply to exit 1."""
+    try:
+        reply = _send_query(socket_path, req)
+    except _DaemonUnavailable:
+        click.echo("Could not connect to daemon. Is it running?", err=True)
+        sys.exit(1)
+    if reply.get("status") == "error":
+        click.echo(reply.get("message", "Query failed."), err=True)
+        sys.exit(1)
+    return reply
+
+
+def _format_span(start: int | None, end: int | None) -> str:
+    if start is None:
+        return "L?"
+    if end is None or end == start:
+        return f"L{start}"
+    return f"L{start}-L{end}"
+
+
+def _print_records(records: list) -> None:
+    """Render display records. Tables show their schema and a CSV preview (with a
+    path to the full Parquet when there are more rows than the preview); plots are
+    spilled to a file and arrive as a `path`; text-ish records are inline."""
+    for i, rec in enumerate(records):
+        t = rec["type"]
+        label = f" {rec['label']}" if rec.get("label") else ""
+        if t == "table":
+            schema = ", ".join(f"{k}: {v}" for k, v in (rec.get("schema") or {}).items())
+            header = f"[{i}] table{label} ({rec.get('rows')} rows) [{schema}]"
+            if "path" in rec:  # preview is a head(); full data is on disk
+                header += f" — first {daemon._TABLE_PREVIEW_ROWS} shown, full data -> {rec['path']}"
+            click.echo(header + ":")
+            click.echo(rec["preview"].rstrip("\n"))
+        elif "path" in rec:  # plots
+            click.echo(f"[{i}] {t}{label} -> {rec['path']}")
+        else:
+            content = rec.get("content")
+            if not isinstance(content, str):
+                content = json.dumps(content, indent=2)
+            click.echo(f"[{i}] {t}:")
+            click.echo(content)
+
+
+@main.group("query")
+def query() -> None:
+    """Inspect a notebook's saved daemon state (intended for AI agents)."""
+
+
+@query.command("cells")
+@click.argument("notebook", type=str)
+def query_cells(notebook: str) -> None:
+    """List a notebook's cells: title, line span, run status, record count."""
+    path, socket_path = _resolve_notebook_target(notebook)
+    reply = _query({"command": "query", "op": "cells", "path": str(path)}, socket_path)
+    cells = reply.get("cells", [])
+    click.echo(f"cells: {reply.get('count', len(cells))}")
+    for c in cells:
+        title = c["title"] or "<empty>"
+        span = _format_span(c["start_line"], c["end_line"])
+        n = c["records"]
+        rec = f"{n} record" + ("" if n == 1 else "s")
+        click.echo(f"{c['id']:>3}  {title:<24} {span:<12} {c['status'] or '?':<7} {rec}")
+
+
+@query.command("records")
+@click.argument("notebook", type=str)
+@click.argument("cell", type=int)
+def query_records(notebook: str, cell: int) -> None:
+    """Show the display records produced by CELL (its numeric id)."""
+    path, socket_path = _resolve_notebook_target(notebook)
+    reply = _query(
+        {"command": "query", "op": "records", "path": str(path), "cell": cell}, socket_path
+    )
+    records = reply.get("records", [])
+    if not records:
+        click.echo("no display records")
+        return
+    _print_records(records)
+
+
+@query.command("exec")
+@click.argument("notebook", type=str)
+@click.option("-c", "--code", "code", default=None, help="Python to run; reads stdin if omitted.")
+def query_exec(notebook: str, code: str | None) -> None:
+    """Run arbitrary Python against the notebook's live namespace (kernel)."""
+    path, socket_path = _resolve_notebook_target(notebook)
+    if code is None:
+        code = sys.stdin.read()
+    reply = _query(
+        {"command": "query", "op": "exec", "path": str(path), "code": code}, socket_path
+    )
+    if reply.get("stdout"):
+        click.echo(reply["stdout"], nl=False)
+    records = reply.get("records") or []
+    if records:
+        _print_records(records)
+    if reply.get("stderr"):
+        click.echo(reply["stderr"], nl=False, err=True)
+    if reply.get("exception"):
+        click.echo(reply["exception"], nl=False, err=True)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

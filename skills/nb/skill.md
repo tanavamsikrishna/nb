@@ -39,6 +39,28 @@ uv run nb daemon .
 uv run nb run <notebook.py>
 ```
 
+## Querying State (for agents)
+
+`nb query` reads the daemon's saved state for a notebook that has already run — a
+headless alternative to opening the browser. All three operations require the
+daemon to be running and the notebook to have run at least once.
+
+```bash
+uv run nb query cells <notebook.py>            # list cells: id, title, line span, status, record count
+uv run nb query records <notebook.py> <CELL>   # display records of a cell (by numeric id)
+uv run nb query exec <notebook.py> -c "CODE"   # run Python against the notebook's live namespace
+```
+
+- `records` prints text/markdown/html inline. **Tables** show their column→dtype schema
+  and a CSV preview of the first rows; when the table has more rows than the preview, the
+  full data is also written to a CSV file and its path is printed. **Plots** (Plotly/Altair)
+  are written to a JSON file and only the path is printed.
+- `exec` runs against the **live, persistent namespace** the last run left behind, so
+  it sees every notebook variable and *can mutate them* (changes persist into later
+  runs — same as a Jupyter kernel). It prints captured stdout/stderr, renders any
+  `display(...)` calls the same way `records` does, and exits non-zero on an uncaught
+  exception. Code may also be piped via stdin (omit `-c`).
+
 ## Cache Management
 
 Caches are invalidated from the command line, not from notebook code.

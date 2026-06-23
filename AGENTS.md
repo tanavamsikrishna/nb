@@ -24,6 +24,11 @@ uv run nb daemon .          # start the daemon once per project session (serves 
 uv run nb run example.py    # send a run request to the daemon over the .nb.sock unix socket
 uv run nb run -w example.py # --watch: re-run automatically on every file save (Ctrl-C to stop)
 
+# Query a notebook's saved daemon state without a browser (for agents)
+uv run nb query cells example.py            # list cells: id, title, line span, status, record count
+uv run nb query records example.py 1        # display records of a cell (tables spill to a Parquet file)
+uv run nb query exec example.py -c "CODE"   # run Python against the notebook's live namespace
+
 # Python tests (pytest + pytest-asyncio)
 uv run pytest                                   # all tests
 uv run pytest nb/tests/test_framework.py        # one file
