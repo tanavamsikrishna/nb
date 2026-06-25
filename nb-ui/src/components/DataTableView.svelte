@@ -8,6 +8,7 @@
     conn       AsyncDuckDB.Connection  — active DuckDB connection
     viewName   string  — name of the registered view (e.g. "t_2_0")
     totalRows  number  — total rows in the original DataFrame
+    label      string | null  — optional caption from display(..., label=...)
     reload     number  — bumped by the parent when the view's buffer is swapped
                          (re-run); re-executes the current query in place
 
@@ -47,11 +48,13 @@
     conn,
     viewName,
     totalRows,
+    label,
     reload,
   }: {
     conn: AsyncDuckDBConnection;
     viewName: string;
     totalRows: number;
+    label?: string | null;
     reload: number;
   } = $props();
 
@@ -269,6 +272,10 @@
 </script>
 
 <div class="table-wrapper">
+  {#if label}
+    <div class="table-label">{label}</div>
+  {/if}
+
   <!-- Query Box -->
   <div class="query-bar">
     <input
@@ -345,6 +352,13 @@
     margin-top: 8px;
   }
 
+  .table-label {
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--fg-primary);
+    margin-bottom: 6px;
+  }
+
   /* Query Bar */
   .query-bar {
     display: flex;
@@ -356,7 +370,7 @@
   .query-input {
     flex: 1;
     font-family: var(--font-mono);
-    font-size: 0.85rem;
+    font-size: 0.7rem;
     background: var(--bg-sunken);
     color: var(--fg-primary);
     border: 1px solid var(--border-default);
@@ -371,7 +385,7 @@
   }
 
   .btn {
-    font-size: 0.8rem;
+    font-size: 0.66rem;
     font-weight: 500;
     padding: 8px 14px;
     border-radius: var(--radius-md);

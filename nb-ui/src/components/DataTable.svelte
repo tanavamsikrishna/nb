@@ -5,7 +5,8 @@
   file name, creates a view, then renders DataTableView.
 
   Props:
-    payload  { data: string, total_rows: number }  — base64 Parquet + row count
+    payload  { data: string, total_rows: number, label?: string }  — base64
+             Parquet + row count + optional caption (from display(..., label=))
 
   Dependencies: $lib/duckdb.js, ./DataTableView.svelte
   Exports: None (render-only component)
@@ -102,6 +103,7 @@
     conn={resolvedConn}
     {viewName}
     totalRows={payload.total_rows}
+    label={payload.label}
     {reload}
   />
 {:catch err}
