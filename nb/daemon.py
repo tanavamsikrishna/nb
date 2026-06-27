@@ -6,6 +6,9 @@ import json
 import os
 import re
 import signal
+import site
+import sys
+import sysconfig
 import tempfile
 import traceback
 import webbrowser
@@ -17,6 +20,33 @@ from aiohttp import web
 
 import nb.framework as fw
 from nb import runner
+
+# Snapshot of sys.modules taken before any notebook runs. Used by --clear-imports
+# to identify and remove only user-added modules (local files the notebook imported)
+# while leaving stdlib, aiohttp, nb.* and other daemon dependencies untouched.
+_baseline_modules: frozenset[str] = frozenset(sys.modules)
+
+
+def _build_package_prefixes() -> frozenset[str]:
+    """Directory prefixes where stdlib and installed packages live."""
+    prefixes: set[str] = set()
+    for key in ("stdlib", "purelib", "platlib"):
+        p = sysconfig.get_path(key)
+        if p:
+            prefixes.add(p)
+    try:
+        prefixes.update(site.getsitepackages())
+    except AttributeError:
+        pass
+    usp = site.getusersitepackages()
+    if usp:
+        prefixes.add(usp)
+    return frozenset(prefixes)
+
+
+# Installed-package and stdlib path prefixes — modules whose __file__ starts
+# with one of these are left alone by --clear-imports.
+_package_prefixes: frozenset[str] = _build_package_prefixes()
 
 @dataclass(eq=False)  # identity hash: each connection is a distinct object
 class Client:
@@ -504,6 +534,7 @@ async def handle_ipc_client(reader: asyncio.StreamReader, writer: asyncio.Stream
             ns_key = str(notebook_path)  # session key + the path this run's events route to
             clear_cache_names = req.get("clear_cache")
             clear_cache_all = req.get("clear_cache_all", False)
+            clear_imports = req.get("clear_imports", False)
             lines = req.get("lines")  # [start, end] for a partial re-run, else None
 
             loop = asyncio.get_running_loop()
@@ -550,6 +581,25 @@ async def handle_ipc_client(reader: asyncio.StreamReader, writer: asyncio.Stream
                 if cache_result is not None:
                     writer.write(
                         json.dumps({"status": "cache", "cache": cache_result}).encode("utf-8")
+                        + b"\n"
+                    )
+                    await writer.drain()
+
+                if clear_imports:
+                    to_remove = [
+                        k
+                        for k, m in list(sys.modules.items())
+                        if k not in _baseline_modules
+                        and (f := getattr(m, "__file__", None)) is not None
+                        and f.endswith(".py")
+                        and not any(f.startswith(p) for p in _package_prefixes)
+                    ]
+                    for k in to_remove:
+                        sys.modules.pop(k, None)
+                    writer.write(
+                        json.dumps(
+                            {"status": "imports", "imports": {"count": len(to_remove)}}
+                        ).encode("utf-8")
                         + b"\n"
                     )
                     await writer.drain()

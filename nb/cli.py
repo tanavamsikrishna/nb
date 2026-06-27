@@ -84,6 +84,9 @@ def _send_run(socket_path: Path, req: dict) -> bool:
             if status == "cache":
                 _report_cache(msg.get("cache") or {})
                 continue
+            if status == "imports":
+                _report_imports(msg.get("imports") or {})
+                continue
             if status == "stdout":
                 # Raw passthrough so notebook output looks like a normal program's.
                 click.echo(msg.get("data", ""), nl=False)
@@ -160,6 +163,14 @@ def main() -> None:
     help="Clear the entire @nb_cache before running.",
 )
 @click.option(
+    "--clear-imports",
+    "clear_imports",
+    is_flag=True,
+    default=False,
+    help="Clear the module import cache (sys.modules) before running, "
+    "forcing all imports to re-read from disk.",
+)
+@click.option(
     "--lines",
     "lines_opt",
     default=None,
@@ -178,6 +189,7 @@ def run(
     notebook: str,
     clear_cache: str | None,
     clear_cache_all: bool,
+    clear_imports: bool,
     lines_opt: str | None,
     watch: bool,
 ) -> None:
@@ -207,6 +219,8 @@ def run(
             click.echo("--clear-cache needs one or more function names.", err=True)
             sys.exit(1)
         req["clear_cache"] = names
+    if clear_imports:
+        req["clear_imports"] = True
 
     try:
         ok = _send_run(socket_path, req)
@@ -241,6 +255,11 @@ def run(
                 sys.exit(1)
     except KeyboardInterrupt:
         click.echo("\nStopped watching.")
+
+
+def _report_imports(imports: dict) -> None:
+    n = imports.get("count", 0)
+    click.echo(f"Cleared {n} {'module' if n == 1 else 'modules'} from import cache.")
 
 
 def _report_cache(cache: dict) -> None:
