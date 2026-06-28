@@ -379,9 +379,7 @@ def query_exec(notebook: str, code: str | None) -> None:
     path, socket_path = _resolve_notebook_target(notebook)
     if code is None:
         code = sys.stdin.read()
-    reply = _query(
-        {"command": "query", "op": "exec", "path": str(path), "code": code}, socket_path
-    )
+    reply = _query({"command": "query", "op": "exec", "path": str(path), "code": code}, socket_path)
     if reply.get("stdout"):
         click.echo(reply["stdout"], nl=False)
     records = reply.get("records") or []

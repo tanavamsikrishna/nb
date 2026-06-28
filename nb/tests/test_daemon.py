@@ -131,9 +131,15 @@ def _emit_full_run(path: str, cells: list[tuple[int, str, object]]) -> "daemon.N
     manifest = [{"id": cid, "title": title} for cid, title, _ in cells]
     daemon.emit_event("run_start", {"cell_manifest": manifest}, path)
     for cid, title, payload in cells:
-        daemon.emit_event("cell_start", {"cell_id": cid, "source_line": cid * 3 + 2, "title": title}, path)
-        daemon.emit_event("display_record", {"cell_id": cid, "type": "object", "payload": payload}, path)
-        daemon.emit_event("cell_end", {"cell_id": cid, "wall_ms": 1, "cpu_ms": 1, "status": "ok"}, path)
+        daemon.emit_event(
+            "cell_start", {"cell_id": cid, "source_line": cid * 3 + 2, "title": title}, path
+        )
+        daemon.emit_event(
+            "display_record", {"cell_id": cid, "type": "object", "payload": payload}, path
+        )
+        daemon.emit_event(
+            "cell_end", {"cell_id": cid, "wall_ms": 1, "cpu_ms": 1, "status": "ok"}, path
+        )
     daemon.emit_event("run_end", {"status": "ok"}, path)
     return session
 
@@ -149,10 +155,16 @@ def test_notebook_state_folds_full_then_partial_run() -> None:
     assert cells[1]["records"] == [{"type": "object", "payload": 15}]
 
     # Partial re-run of cell 1 only, producing new output.
-    daemon.emit_event("run_start", {"cell_manifest": [{"id": 1, "title": "b"}], "partial": True}, "/tmp/nb.py")
+    daemon.emit_event(
+        "run_start", {"cell_manifest": [{"id": 1, "title": "b"}], "partial": True}, "/tmp/nb.py"
+    )
     daemon.emit_event("cell_start", {"cell_id": 1, "source_line": 5, "title": "b"}, "/tmp/nb.py")
-    daemon.emit_event("display_record", {"cell_id": 1, "type": "object", "payload": 99}, "/tmp/nb.py")
-    daemon.emit_event("cell_end", {"cell_id": 1, "wall_ms": 1, "cpu_ms": 1, "status": "ok"}, "/tmp/nb.py")
+    daemon.emit_event(
+        "display_record", {"cell_id": 1, "type": "object", "payload": 99}, "/tmp/nb.py"
+    )
+    daemon.emit_event(
+        "cell_end", {"cell_id": 1, "wall_ms": 1, "cpu_ms": 1, "status": "ok"}, "/tmp/nb.py"
+    )
     daemon.emit_event("run_end", {"status": "ok"}, "/tmp/nb.py")
 
     cells = session.cells
@@ -233,8 +245,12 @@ def test_partial_run_folds_into_its_own_session_not_the_active_one() -> None:
         daemon.emit_event("run_start", {"cell_manifest": manifest}, path)
         for cid, t, payload in cells:
             daemon.emit_event("cell_start", {"cell_id": cid, "source_line": 2, "title": t}, path)
-            daemon.emit_event("display_record", {"cell_id": cid, "type": "object", "payload": payload}, path)
-            daemon.emit_event("cell_end", {"cell_id": cid, "wall_ms": 1, "cpu_ms": 1, "status": "ok"}, path)
+            daemon.emit_event(
+                "display_record", {"cell_id": cid, "type": "object", "payload": payload}, path
+            )
+            daemon.emit_event(
+                "cell_end", {"cell_id": cid, "wall_ms": 1, "cpu_ms": 1, "status": "ok"}, path
+            )
         daemon.emit_event("run_end", {"status": "ok"}, path)
 
     full_run("/tmp/a.py", [(0, "a0", "A0"), (1, "a1", "A1")])
@@ -242,10 +258,16 @@ def test_partial_run_folds_into_its_own_session_not_the_active_one() -> None:
 
     # Partial re-run of A's cell 1. The events carry A's path, so they must fold
     # into A, not the most-recently-displayed B.
-    daemon.emit_event("run_start", {"cell_manifest": [{"id": 1, "title": "a1"}], "partial": True}, "/tmp/a.py")
+    daemon.emit_event(
+        "run_start", {"cell_manifest": [{"id": 1, "title": "a1"}], "partial": True}, "/tmp/a.py"
+    )
     daemon.emit_event("cell_start", {"cell_id": 1, "source_line": 5, "title": "a1"}, "/tmp/a.py")
-    daemon.emit_event("display_record", {"cell_id": 1, "type": "object", "payload": "A1*"}, "/tmp/a.py")
-    daemon.emit_event("cell_end", {"cell_id": 1, "wall_ms": 1, "cpu_ms": 1, "status": "ok"}, "/tmp/a.py")
+    daemon.emit_event(
+        "display_record", {"cell_id": 1, "type": "object", "payload": "A1*"}, "/tmp/a.py"
+    )
+    daemon.emit_event(
+        "cell_end", {"cell_id": 1, "wall_ms": 1, "cpu_ms": 1, "status": "ok"}, "/tmp/a.py"
+    )
     daemon.emit_event("run_end", {"status": "ok"}, "/tmp/a.py")
 
     a_cells = daemon._sessions["/tmp/a.py"].cells

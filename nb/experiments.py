@@ -133,9 +133,7 @@ def list_notebooks(root: Any) -> list[dict]:
             info = json.loads(nb_json.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             continue
-        run_count = sum(
-            1 for d in nb_dir.iterdir() if d.is_dir() and (d / "meta.json").is_file()
-        )
+        run_count = sum(1 for d in nb_dir.iterdir() if d.is_dir() and (d / "meta.json").is_file())
         out.append({"path": info["path"], "name": info["name"], "run_count": run_count})
     return out
 
@@ -194,8 +192,6 @@ def load_run(root: Any, notebook_path: Any, run_id: str) -> dict | None:
         "code": code,
         "docstring": docstring,
         "cells": (
-            json.loads(records_file.read_text(encoding="utf-8"))
-            if records_file.is_file()
-            else []
+            json.loads(records_file.read_text(encoding="utf-8")) if records_file.is_file() else []
         ),
     }

@@ -23,6 +23,7 @@ from aiohttp import web
 import nb.framework as fw
 from nb import experiments, runner
 
+
 class CellRecord(TypedDict):
     type: str
     payload: Any
@@ -73,6 +74,7 @@ def _build_package_prefixes() -> frozenset[str]:
 # Installed-package and stdlib path prefixes — modules whose __file__ starts
 # with one of these are left alone by --clear-imports.
 _package_prefixes: frozenset[str] = _build_package_prefixes()
+
 
 @dataclass(eq=False)  # identity hash: each connection is a distinct object
 class Client:
@@ -573,9 +575,7 @@ async def _handle_query(req: dict, writer: asyncio.StreamWriter) -> None:
                     "message": "Notebook has no execution namespace yet; run it first.",
                 }
             else:
-                reply = await loop.run_in_executor(
-                    None, _exec_in_ns, session, req.get("code", "")
-                )
+                reply = await loop.run_in_executor(None, _exec_in_ns, session, req.get("code", ""))
         else:
             reply = {"status": "error", "message": f"Unknown query op: {op!r}."}
 

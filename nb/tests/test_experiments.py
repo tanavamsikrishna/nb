@@ -50,7 +50,9 @@ def test_params_extracted_into_meta(tmp_path: Path) -> None:
     # params records anywhere in the run are merged into meta["params"].
     cells = [
         _cell(0, [{"type": "params", "payload": {"lr": 0.01}}]),
-        _cell(1, [{"type": "text", "payload": "noise"}, {"type": "params", "payload": {"epochs": 10}}]),
+        _cell(
+            1, [{"type": "text", "payload": "noise"}, {"type": "params", "payload": {"epochs": 10}}]
+        ),
     ]
     run_id = _save_full(tmp_path, "/proj/example.py", cells)
     loaded = experiments.load_run(tmp_path, "/proj/example.py", run_id)
