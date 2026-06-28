@@ -161,7 +161,7 @@ display(fig)
 
 
 def wrong_func():
-    displayx("oops")
+    display("oops")
 
 
 # %% Calling the nasty

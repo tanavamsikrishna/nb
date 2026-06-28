@@ -8,6 +8,11 @@
   import NotebookHeader from "./NotebookHeader.svelte";
   import Cell_ from "./Cell.svelte";
   import RunSummary from "./RunSummary.svelte";
+  import hljs from "highlight.js/lib/core";
+  import python from "highlight.js/lib/languages/python";
+  import "highlight.js/styles/github.css";
+
+  hljs.registerLanguage("python", python);
 
   let {
     cells,
@@ -22,6 +27,9 @@
   } = $props();
 
   let visibleCells = $derived(cells.filter((c) => c.records.length > 0));
+  let highlightedCode = $derived(
+    code ? hljs.highlight(code, { language: "python" }).value : null,
+  );
 </script>
 
 {#if docstring}
@@ -44,7 +52,7 @@
   <section class="source-block">
     <details>
       <summary>Source code</summary>
-      <pre class="code-block">{code}</pre>
+      <pre class="code-block"><code class="hljs">{@html highlightedCode}</code></pre>
     </details>
   </section>
 {/if}
@@ -80,5 +88,11 @@
     color: var(--fg-primary);
     overflow-x: auto;
     white-space: pre;
+  }
+
+  /* Let the .code-block surface control the background; hljs theme sets its own */
+  .code-block :global(.hljs) {
+    background: transparent;
+    padding: 0;
   }
 </style>

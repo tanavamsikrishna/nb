@@ -1,6 +1,6 @@
 # nb
 
-A lightweight Python notebook runner. Notebooks are plain `.py` files with `# %%`
+A lightweight Python notebook runner with experiment tracking. Notebooks are plain `.py` files with `# %%`
 cell delimiters — no JSON, no hidden state, fully diffable and git-friendly. A persistent
 daemon executes them cell-by-cell and streams output to a live web UI.
 
