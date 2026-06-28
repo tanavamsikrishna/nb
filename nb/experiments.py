@@ -21,6 +21,7 @@ These helpers do no locking of their own: the daemon calls `save_run` while
 holding `run_lock`, which already serializes runs.
 """
 
+import ast
 import hashlib
 import json
 import os
@@ -183,9 +184,15 @@ def load_run(root: Any, notebook_path: Any, run_id: str) -> dict | None:
         return None
     code_file = run_dir / "code.py"
     records_file = run_dir / "records.json"
+    code = code_file.read_text(encoding="utf-8") if code_file.is_file() else ""
+    try:
+        docstring = ast.get_docstring(ast.parse(code))
+    except Exception:
+        docstring = None
     return {
         "meta": json.loads(meta_file.read_text(encoding="utf-8")),
-        "code": code_file.read_text(encoding="utf-8") if code_file.is_file() else "",
+        "code": code,
+        "docstring": docstring,
         "cells": (
             json.loads(records_file.read_text(encoding="utf-8"))
             if records_file.is_file()

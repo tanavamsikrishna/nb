@@ -8,6 +8,7 @@ import type {
 
 export const notebookHeader = writable<string | null>(null);
 export const notebookPath = writable<string | null>(null);
+export const notebookSource = writable<string | null>(null);
 export const cells = writable<Cell[]>([]);
 export const connectionStatus = writable<ConnectionStatus>("disconnected");
 

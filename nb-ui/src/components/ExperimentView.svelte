@@ -8,9 +8,9 @@
 -->
 <script lang="ts">
   import { onMount } from "svelte";
-  import Cell from "./Cell.svelte";
   import type { ExperimentDetail } from "../lib/types";
   import AppShell from "./AppShell.svelte";
+  import NotebookView from "./NotebookView.svelte";
 
   let { path, runId }: { path: string; runId: string } = $props();
 
@@ -55,10 +55,6 @@
   }
 
   onMount(load);
-
-  let visibleCells = $derived(
-    (detail?.cells ?? []).filter((c) => c.records.length > 0),
-  );
 </script>
 
 <AppShell>
@@ -98,23 +94,11 @@
       </section>
     {/if}
 
-    {#if visibleCells.length > 0}
-      <section class="block">
-        <h3>Outputs</h3>
-        <div class="cells-list">
-          {#each visibleCells as cell (cell.id)}
-            <Cell {cell} />
-          {/each}
-        </div>
-      </section>
-    {/if}
-
-    <section class="block">
-      <details>
-        <summary>Source code</summary>
-        <pre class="code-block">{detail.code}</pre>
-      </details>
-    </section>
+    <NotebookView
+      cells={detail.cells}
+      docstring={detail.docstring}
+      code={detail.code}
+    />
   {:else if loaded}
     <div class="empty-state">
       <h2>Run not found</h2>
@@ -217,33 +201,5 @@
   .params-table tr:last-child th,
   .params-table tr:last-child td {
     border-bottom: none;
-  }
-
-  .cells-list {
-    display: flex;
-    flex-direction: column;
-  }
-
-  summary {
-    cursor: pointer;
-    font-family: var(--font-sans);
-    font-size: 0.8rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--fg-secondary);
-  }
-
-  .code-block {
-    margin: 12px 0 0;
-    padding: 16px;
-    background: var(--bg-sunken);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-md);
-    font-family: var(--font-mono);
-    font-size: 0.8rem;
-    line-height: 1.5;
-    color: var(--fg-primary);
-    overflow-x: auto;
-    white-space: pre;
   }
 </style>

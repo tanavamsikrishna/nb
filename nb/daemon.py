@@ -91,6 +91,7 @@ class NotebookSession:
     path: str
     exec_ns: dict = field(default_factory=dict)
     docstring: str | None = None
+    code: str | None = None
     cells: list[dict] = field(default_factory=list)
     # run_id of this notebook's most recent *full* run. A partial re-run is saved
     # as a child experiment of it (None until the first full run; a fresh daemon
@@ -144,6 +145,8 @@ def _fold_state(event_type: str, data: dict, path: str) -> None:
 
     if event_type == "notebook_header":
         session.docstring = data.get("docstring")
+        if "code" in data:
+            session.code = data.get("code")
     elif event_type == "run_start":
         manifest = data.get("cell_manifest", [])
         if data.get("partial"):
@@ -210,6 +213,8 @@ def _snapshot_events(session: NotebookSession | None) -> list[dict]:
     header: dict = {"path": session.path}
     if session.docstring is not None:
         header["docstring"] = session.docstring
+    if session.code is not None:
+        header["code"] = session.code
     events.append({"event": "notebook_header", "data": header})
 
     manifest = [{"id": c["id"], "title": c["title"] or ""} for c in session.cells]

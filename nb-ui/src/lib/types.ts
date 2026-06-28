@@ -122,6 +122,7 @@ export interface ExperimentsResponse {
 export interface ExperimentDetail {
   meta: Omit<ExperimentRun, "children">;
   code: string;
+  docstring: string | null;
   cells: Cell[];
 }
 
@@ -135,6 +136,7 @@ export interface CellManifestItem {
 export interface NotebookHeaderEvent {
   path: string;
   docstring?: string;
+  code?: string;
 }
 
 export interface RunStartEvent {

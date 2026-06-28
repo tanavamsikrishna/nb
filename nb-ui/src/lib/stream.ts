@@ -3,6 +3,7 @@ import {
   connectionStatus,
   notebookHeader,
   notebookPath,
+  notebookSource,
   runningCell,
   runError,
 } from "../stores/cells";
@@ -40,6 +41,9 @@ export function connectStream(path: string) {
     notebookPath.set(data.path);
     if (data.docstring) {
       notebookHeader.set(data.docstring);
+    }
+    if (data.code !== undefined) {
+      notebookSource.set(data.code);
     }
   });
 

@@ -247,7 +247,7 @@ def run_notebook(
     # changed); emitting it would reset the daemon's notebook_state. A full run
     # always emits, even without a docstring, so the frontend receives the path.
     if not partial:
-        header_data: dict = {"path": str(path)}
+        header_data: dict = {"path": str(path), "code": source}
         if docstring is not None:
             header_data["docstring"] = docstring
         emit_event("notebook_header", header_data)
