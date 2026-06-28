@@ -16,12 +16,32 @@ import webbrowser
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Set
+from typing import Any, Set, TypedDict
 
 from aiohttp import web
 
 import nb.framework as fw
 from nb import experiments, runner
+
+class CellRecord(TypedDict):
+    type: str
+    payload: Any
+
+
+class CellProfiling(TypedDict):
+    wall_ms: float | None
+    cpu_ms: float | None
+
+
+class CellState(TypedDict):
+    id: int
+    title: str | None
+    source_line: int | None
+    status: str
+    stale: bool
+    profiling: CellProfiling | None
+    records: list[CellRecord]
+
 
 # Project root the daemon serves, set once in `main`. Experiments are persisted
 # under `<_project_dir>/.nb/experiments` and listed/loaded from there.
@@ -92,7 +112,7 @@ class NotebookSession:
     exec_ns: dict = field(default_factory=dict)
     docstring: str | None = None
     code: str | None = None
-    cells: list[dict] = field(default_factory=list)
+    cells: list[CellState] = field(default_factory=list)
     # run_id of this notebook's most recent *full* run. A partial re-run is saved
     # as a child experiment of it (None until the first full run; a fresh daemon
     # with no session falls back to a full run, so a child never lacks a parent).
@@ -114,14 +134,14 @@ def _fresh_exec_ns() -> dict:
     }
 
 
-def _state_find_cell(cells: list[dict], cell_id: int | None) -> dict | None:
+def _state_find_cell(cells: list[CellState], cell_id: int | None) -> CellState | None:
     for cell in cells:
         if cell["id"] == cell_id:
             return cell
     return None
 
 
-def _new_cell_state(cell_id: int, title: str | None = None) -> dict:
+def _new_cell_state(cell_id: int, title: str | None = None) -> CellState:
     return {
         "id": cell_id,
         "title": title,
@@ -197,7 +217,7 @@ def _fold_state(event_type: str, data: dict, path: str) -> None:
     elif event_type == "cell_end":
         cell = _state_find_cell(cells, data["cell_id"])
         if cell is not None:
-            cell["status"] = data.get("status")
+            cell["status"] = data.get("status", "ok")
             cell["profiling"] = {"wall_ms": data.get("wall_ms"), "cpu_ms": data.get("cpu_ms")}
 
 
@@ -447,7 +467,7 @@ def _spill(session: NotebookSession, tag: str, n: int, suffix: str, data: bytes)
     return str(fpath)
 
 
-def _render_record(record: dict, session: NotebookSession, tag: str, n: int) -> dict:
+def _render_record(record: CellRecord, session: NotebookSession, tag: str, n: int) -> dict:
     """Map one display record to a query-reply entry.
 
     - table: always returns `schema` (column -> dtype) and a CSV `preview` of the

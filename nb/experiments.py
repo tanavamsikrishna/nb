@@ -59,7 +59,7 @@ def _mint_run_id() -> str:
     return f"{ts}-{os.urandom(2).hex()}"
 
 
-def _collect_params(cells: list[dict]) -> dict:
+def _collect_params(cells: list[Any]) -> dict:
     """Merge every ``params(...)`` record across the run's cells into one dict."""
     out: dict = {}
     for cell in cells:
@@ -73,7 +73,7 @@ def save_run(
     root: Any,
     notebook_path: Any,
     code: str,
-    cells: list[dict],
+    cells: list[Any],
     *,
     parent_run_id: str | None,
     kind: str,
