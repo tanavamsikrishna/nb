@@ -151,6 +151,21 @@
             <div class="object-output">
               <JSONTree val={record.payload} />
             </div>
+          {:else if record.type === "params"}
+            <table class="params-output">
+              <tbody>
+                {#each Object.entries(record.payload) as [key, value]}
+                  <tr>
+                    <th>{key}</th>
+                    <td
+                      >{typeof value === "object" && value !== null
+                        ? JSON.stringify(value)
+                        : String(value)}</td
+                    >
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
           {:else if record.type === "text"}
             <pre class="text-output">{record.payload}</pre>
           {/if}
@@ -332,6 +347,38 @@
     border-radius: var(--radius-md);
     padding: 12px;
     overflow-x: auto;
+  }
+
+  /* params(...) — a compact key/value table of experiment hyperparameters */
+  .params-output {
+    border-collapse: collapse;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+  }
+
+  .params-output th {
+    text-align: left;
+    font-weight: 600;
+    color: var(--fg-secondary);
+    background: var(--bg-header);
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--border-subtle);
+    border-right: 1px solid var(--border-subtle);
+    white-space: nowrap;
+  }
+
+  .params-output td {
+    padding: 6px 12px;
+    color: var(--fg-primary);
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .params-output tr:last-child th,
+  .params-output tr:last-child td {
+    border-bottom: none;
   }
 
   .error-msg {

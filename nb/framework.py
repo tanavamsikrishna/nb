@@ -166,6 +166,17 @@ def display(
     _sink.get()(_create_display_record(obj, as_, label=label))
 
 
+def params(**kwargs: Any) -> None:
+    """Record experiment hyperparameters.
+
+    Like ``display`` it emits through the active sink, so the values are rendered
+    live (as a key/value table), captured/replayed by ``@nb_cache``, and folded
+    into the daemon's cell state — but it produces a distinct ``"params"`` record
+    so experiment tracking can collect them separately from ordinary output.
+    """
+    _sink.get()(DisplayRecord(type="params", payload=_serialize_object(kwargs)))
+
+
 def _code_fingerprint(code: types.CodeType) -> bytes:
     # A line-number-independent fingerprint of a code object's logic. We hash the
     # opcodes, signature shape, symbol names, and constants (recursing into nested

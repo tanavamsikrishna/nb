@@ -21,6 +21,8 @@ export default defineConfig({
     proxy: {
       "/stream": "http://localhost:7777",
       "/notebooks": "http://localhost:7777",
+      "/experiments": "http://localhost:7777",
+      "/experiment": "http://localhost:7777",
     },
   },
 });

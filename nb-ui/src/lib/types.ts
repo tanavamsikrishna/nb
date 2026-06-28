@@ -15,7 +15,8 @@ export type RecordType =
   | "object"
   | "table"
   | "plotly"
-  | "altair";
+  | "altair"
+  | "params";
 
 /** Base64-encoded Parquet payload for a `table` record (see `_serialize_table`). */
 export interface TablePayload {
@@ -40,7 +41,9 @@ export type DisplayRecord =
   | { type: "table"; payload: TablePayload }
   | { type: "plotly"; payload: PlotlyPayload }
   | { type: "altair"; payload: unknown }
-  | { type: "object"; payload: unknown };
+  | { type: "object"; payload: unknown }
+  /** Experiment hyperparameters from `params(...)`; payload is a flat kv map. */
+  | { type: "params"; payload: Record<string, unknown> };
 
 /** Lifecycle state of a cell. `ok`/`error` are the terminal run outcomes. */
 export type CellStatus = "pending" | "running" | "ok" | "error";
@@ -85,10 +88,41 @@ export interface NotebookListItem {
   /** Basename, for display. */
   name: string;
   num_cells: number;
+  /** True when the daemon holds a live session (streamable at `?path=`). */
+  active?: boolean;
+  /** True when the notebook has stored experiments (`?view=experiments`). */
+  has_experiments?: boolean;
 }
 
 export interface NotebooksResponse {
   notebooks: NotebookListItem[];
+}
+
+/* ── Experiment tracking (see nb/experiments.py, daemon experiments_handler) ── */
+
+/** One saved run's metadata; `children` are partial runs of a full parent run. */
+export interface ExperimentRun {
+  run_id: string;
+  parent_run_id: string | null;
+  kind: "full" | "partial";
+  started_at: string;
+  dur_ms: number;
+  status: "ok" | "error";
+  error: string | null;
+  cell_ids: number[];
+  params: Record<string, unknown>;
+  children: ExperimentRun[];
+}
+
+export interface ExperimentsResponse {
+  runs: ExperimentRun[];
+}
+
+/** A single loaded run for the read-only viewer (`/experiment`). */
+export interface ExperimentDetail {
+  meta: Omit<ExperimentRun, "children">;
+  code: string;
+  cells: Cell[];
 }
 
 /* ── SSE event payloads (the `data` field of each event; see nb/runner.py) ── */

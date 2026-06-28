@@ -14,3 +14,4 @@ nb/static/
 nb-ui/dist/
 nb-ui/node_modules/
 .nb.sock
+.nb/

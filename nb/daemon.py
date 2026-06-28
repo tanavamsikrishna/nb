@@ -10,16 +10,22 @@ import site
 import sys
 import sysconfig
 import tempfile
+import time
 import traceback
 import webbrowser
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Set
 
 from aiohttp import web
 
 import nb.framework as fw
-from nb import runner
+from nb import experiments, runner
+
+# Project root the daemon serves, set once in `main`. Experiments are persisted
+# under `<_project_dir>/.nb/experiments` and listed/loaded from there.
+_project_dir: Path = Path.cwd()
 
 # Snapshot of sys.modules taken before any notebook runs. Used by --clear-imports
 # to identify and remove only user-added modules (local files the notebook imported)
@@ -86,6 +92,10 @@ class NotebookSession:
     exec_ns: dict = field(default_factory=dict)
     docstring: str | None = None
     cells: list[dict] = field(default_factory=list)
+    # run_id of this notebook's most recent *full* run. A partial re-run is saved
+    # as a child experiment of it (None until the first full run; a fresh daemon
+    # with no session falls back to a full run, so a child never lacks a parent).
+    parent_run_id: str | None = None
 
 
 # Every notebook the daemon has run this session, keyed by resolved path. Render
@@ -316,19 +326,53 @@ async def stream_handler(request: web.Request) -> web.StreamResponse:
 
 
 async def notebooks_handler(request: web.Request) -> web.Response:
-    """List the notebooks the daemon currently holds state for — the index page's
-    picker. Each has run at least once this session, so each has a streamable
-    snapshot at `/?path=<path>`."""
-    notebooks = [
-        {
+    """List notebooks for the index page: the union of those the daemon currently
+    holds live state for (streamable at `/?path=<path>`) and those with stored
+    experiments (browsable at `/?view=experiments&path=<path>`) even when no
+    session is live. `num_cells` is 0 for an experiments-only notebook."""
+    by_path: dict[str, dict] = {}
+    for path, session in _sessions.items():
+        by_path[path] = {
             "path": path,
             "name": os.path.basename(path),
             "num_cells": len(session.cells),
+            "active": True,
+            "has_experiments": False,
         }
-        for path, session in _sessions.items()
-    ]
-    notebooks.sort(key=lambda nb: nb["path"])
+    for nb in experiments.list_notebooks(_project_dir):
+        entry = by_path.get(nb["path"])
+        if entry is None:
+            entry = {
+                "path": nb["path"],
+                "name": nb["name"],
+                "num_cells": 0,
+                "active": False,
+            }
+            by_path[nb["path"]] = entry
+        entry["has_experiments"] = nb["run_count"] > 0
+
+    notebooks = sorted(by_path.values(), key=lambda nb: nb["path"])
     return web.json_response({"notebooks": notebooks})
+
+
+async def experiments_handler(request: web.Request) -> web.Response:
+    """Run history for one notebook as a parent/child forest (newest-first)."""
+    path = request.query.get("path")
+    if not path:
+        return web.json_response({"error": "missing path"}, status=400)
+    return web.json_response({"runs": experiments.list_runs_tree(_project_dir, path)})
+
+
+async def experiment_handler(request: web.Request) -> web.Response:
+    """One saved run: `{meta, code, cells}` for the read-only viewer."""
+    path = request.query.get("path")
+    run_id = request.query.get("run_id")
+    if not path or not run_id:
+        return web.json_response({"error": "missing path or run_id"}, status=400)
+    run = experiments.load_run(_project_dir, path, run_id)
+    if run is None:
+        return web.json_response({"error": "not found"}, status=404)
+    return web.json_response(run)
 
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -626,7 +670,9 @@ async def handle_ipc_client(reader: asyncio.StreamReader, writer: asyncio.Stream
                     session.exec_ns = _fresh_exec_ns()
 
                 # Execute notebook in separate thread so exec doesn't block the main event loop
-                errored = await loop.run_in_executor(
+                started_at = datetime.now(timezone.utc).isoformat()
+                t0 = time.perf_counter()
+                errored, run_code, ran_cell_ids = await loop.run_in_executor(
                     None,
                     runner.run_notebook,
                     notebook_path,
@@ -635,6 +681,39 @@ async def handle_ipc_client(reader: asyncio.StreamReader, writer: asyncio.Stream
                     cli_log,
                     target_lines,
                 )
+                dur_ms = int((time.perf_counter() - t0) * 1000)
+
+                # Persist the run as an experiment. By the time the executor future
+                # resolves, session.cells is fully folded (run_end was scheduled via
+                # call_soon_threadsafe before the executor returned, and the loop
+                # drains those FIFO before resuming here). A full run becomes a
+                # parent; a partial run is saved as a child of the last full run.
+                # run_code is "" only on a file-read failure — nothing worth saving.
+                if run_code:
+                    is_partial = target_lines is not None
+                    # A partial run leaves the parent's other cells in session.cells;
+                    # save only the cells this run actually executed (spec: a child
+                    # run records only its own cells, not the parent's).
+                    ran_ids = set(ran_cell_ids)
+                    saved_cells = [c for c in session.cells if c["id"] in ran_ids]
+                    try:
+                        saved_id = experiments.save_run(
+                            _project_dir,
+                            ns_key,
+                            run_code,
+                            saved_cells,
+                            parent_run_id=session.parent_run_id if is_partial else None,
+                            kind="partial" if is_partial else "full",
+                            started_at=started_at,
+                            dur_ms=dur_ms,
+                            status="error" if errored else "ok",
+                            error="Notebook execution failed." if errored else None,
+                        )
+                        if not is_partial:
+                            session.parent_run_id = saved_id
+                    except Exception as exc:
+                        # Saving an experiment must never break the run itself.
+                        cli_log("stderr", f"[nb] failed to save experiment: {exc}\n")
 
                 # Reply reflects the run outcome so `nb run` exits non-zero on a
                 # cell error (the full traceback already streamed via cli_log).
@@ -686,6 +765,8 @@ async def open_site_in_browser(site_url: str) -> None:
 
 
 async def main(project_dir: Path, *, host: str = "0.0.0.0", port: int = 7777) -> None:
+    global _project_dir
+    _project_dir = project_dir
     socket_path = project_dir / ".nb.sock"
     if socket_path.exists():
         socket_path.unlink()
@@ -695,6 +776,8 @@ async def main(project_dir: Path, *, host: str = "0.0.0.0", port: int = 7777) ->
     app = web.Application()
     app.router.add_get("/stream", stream_handler)
     app.router.add_get("/notebooks", notebooks_handler)
+    app.router.add_get("/experiments", experiments_handler)
+    app.router.add_get("/experiment", experiment_handler)
     app.router.add_get("/", index_handler)
     app.router.add_static("/", STATIC_DIR)
 

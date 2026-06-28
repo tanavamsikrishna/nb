@@ -31,125 +31,137 @@
   import Cell from "./components/Cell.svelte";
   import RunSummary from "./components/RunSummary.svelte";
   import NotebookList from "./components/NotebookList.svelte";
+  import ExperimentsList from "./components/ExperimentsList.svelte";
+  import ExperimentView from "./components/ExperimentView.svelte";
 
-  // The view is selected by the `?path=` query param: absent → the index list of
-  // notebooks; present → that notebook's live stream. Navigation between them is a
-  // full-page load, so each notebook view is a fresh SPA bound to one path.
-  const path = new URLSearchParams(window.location.search).get("path");
+  // The view is selected by query params (navigation is a full-page load, so each
+  // view is a fresh SPA):
+  //   (none)                      → index list of notebooks
+  //   ?view=experiments&path=X    → run history for notebook X
+  //   ?path=X&run=R               → read-only view of saved run R
+  //   ?path=X                     → notebook X's live stream
+  const params = new URLSearchParams(window.location.search);
+  const path = params.get("path");
+  const view = params.get("view");
+  const run = params.get("run");
+  const liveStream = !!path && view !== "experiments" && !run;
 
   onMount(() => {
-    if (path) {
+    if (liveStream) {
       // Show the path in the header immediately, before the first event arrives.
-      notebookPath.set(path);
-      connectStream(path);
+      notebookPath.set(path!);
+      connectStream(path!);
     }
   });
 </script>
 
-{#if !path}
+{#if path && view === "experiments"}
+  <ExperimentsList {path} />
+{:else if path && run}
+  <ExperimentView {path} runId={run} />
+{:else if !path}
   <NotebookList />
 {:else}
+  <div class="app-wrapper">
+    <!-- Top Navigation Bar -->
+    <header class="app-header">
+      <div class="header-content">
+        <div class="logo-area">
+          <a class="logo-nb logo-home" href="/" title="All notebooks">nb</a>
+          <span class="logo-separator">/</span>
+          <span class="logo-sub">notebook stream</span>
+          {#if $notebookPath}
+            <span class="notebook-path" use:tooltip={$notebookPath}>
+              <span class="notebook-path-text">{"‎" + $notebookPath}</span>
+            </span>
+          {/if}
+        </div>
 
-<div class="app-wrapper">
-  <!-- Top Navigation Bar -->
-  <header class="app-header">
-    <div class="header-content">
-      <div class="logo-area">
-        <a class="logo-nb logo-home" href="/" title="All notebooks">nb</a>
-        <span class="logo-separator">/</span>
-        <span class="logo-sub">notebook stream</span>
-        {#if $notebookPath}
-          <span class="notebook-path" use:tooltip={$notebookPath}>
-            <span class="notebook-path-text">{"‎" + $notebookPath}</span>
-          </span>
-        {/if}
+        <div class="conn-status {$connectionStatus}">
+          <div class="conn-dot"></div>
+          {#if $connectionStatus === "connected"}
+            connected to daemon
+          {:else if $connectionStatus === "connecting"}
+            connecting...
+          {:else}
+            disconnected
+          {/if}
+        </div>
       </div>
 
-      <div class="conn-status {$connectionStatus}">
-        <div class="conn-dot"></div>
-        {#if $connectionStatus === "connected"}
-          connected to daemon
-        {:else if $connectionStatus === "connecting"}
-          connecting...
-        {:else}
-          disconnected
-        {/if}
-      </div>
-    </div>
-
-    <!-- Sticky error banner: shown after a run fails, persists until the next
+      <!-- Sticky error banner: shown after a run fails, persists until the next
          run starts. Takes precedence over the live indicator. -->
-    {#if $runError}
-      <div class="exec-bar error">
-        <div class="exec-content">
-          <span class="exec-num">Cell {$runError.id + 1}</span>
-          {#if $runError.title}
-            <span class="exec-title">{$runError.title}</span>
-          {/if}
-          <span class="error-message">{$runError.message}</span>
+      {#if $runError}
+        <div class="exec-bar error">
+          <div class="exec-content">
+            <span class="exec-num">Cell {$runError.id + 1}</span>
+            {#if $runError.title}
+              <span class="exec-title">{$runError.title}</span>
+            {/if}
+            <span class="error-message">{$runError.message}</span>
+          </div>
         </div>
-      </div>
-      <!-- Live "now executing" indicator: only present while a cell runs. -->
-    {:else if $runningCell}
-      <div class="exec-bar">
-        <div class="exec-content">
-          <div class="run-dot" aria-hidden="true"></div>
-          <span class="exec-num">Cell {$runningCell.id + 1}</span>
-          {#if $runningCell.title}
-            <span class="exec-title">{$runningCell.title}</span>
-          {/if}
+        <!-- Live "now executing" indicator: only present while a cell runs. -->
+      {:else if $runningCell}
+        <div class="exec-bar">
+          <div class="exec-content">
+            <div class="run-dot" aria-hidden="true"></div>
+            <span class="exec-num">Cell {$runningCell.id + 1}</span>
+            {#if $runningCell.title}
+              <span class="exec-title">{$runningCell.title}</span>
+            {/if}
+          </div>
         </div>
-      </div>
-    {/if}
-  </header>
+      {/if}
+    </header>
 
-  <!-- Main Content Area -->
-  <main class="main-container">
-    {#if $notebookHeader}
-      <NotebookHeader docstring={$notebookHeader} />
-    {/if}
+    <!-- Main Content Area -->
+    <main class="main-container">
+      {#if $notebookHeader}
+        <NotebookHeader docstring={$notebookHeader} />
+      {/if}
 
-    {#if $cells.length === 0}
-      <div class="empty-state">
-        <div class="empty-icon-wrap">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke-width="1.5"
-            stroke="currentColor"
-            class="empty-icon"
+      {#if $cells.length === 0}
+        <div class="empty-state">
+          <div class="empty-icon-wrap">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke-width="1.5"
+              stroke="currentColor"
+              class="empty-icon"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5"
+              />
+            </svg>
+          </div>
+          <h2>No Active Notebook Stream</h2>
+          <p>
+            The UI is waiting for a notebook execution. Start a run using the
+            command line:
+          </p>
+          <code class="cmd-example"
+            >nb run <span class="arg">my_notebook.py</span></code
           >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5"
-            />
-          </svg>
         </div>
-        <h2>No Active Notebook Stream</h2>
-        <p>
-          The UI is waiting for a notebook execution. Start a run using the
-          command line:
-        </p>
-        <code class="cmd-example"
-          >nb run <span class="arg">my_notebook.py</span></code
-        >
-      </div>
-    {:else}
-      <!-- Only cells that produced output are rendered; cells with no display
+      {:else}
+        <!-- Only cells that produced output are rendered; cells with no display
            records (imports, pure computation) stay hidden. Cell ids are kept
            as-is so visible numbers still match the notebook. -->
-      <div class="cells-list">
-        {#each $cells.filter((c) => c.records.length > 0) as cell (cell.id)}
-          <Cell {cell} />
-        {/each}
-      </div>
+        <div class="cells-list">
+          {#each $cells.filter((c) => c.records.length > 0) as cell (cell.id)}
+            <Cell {cell} />
+          {/each}
+        </div>
 
-      <RunSummary cells={$cells} />
-    {/if}
-  </main>
-</div>
+        <RunSummary cells={$cells} />
+      {/if}
+    </main>
+  </div>
 {/if}
 
 <style>

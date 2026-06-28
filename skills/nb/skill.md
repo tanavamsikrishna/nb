@@ -67,6 +67,22 @@ uv run nb query exec <notebook.py> -c "CODE"   # run Python against the notebook
 If a query errors with no daemon reply, start the daemon (`uv run nb daemon .`)
 and run the notebook once (`uv run nb run <notebook.py>`) before querying.
 
+## Experiment Tracking
+
+Every `nb run` is persisted as an experiment under `.nb/experiments/` at the
+project root (survives daemon restarts). Each run saves its source code, the
+display records it produced, and any hyperparameters declared with `params(...)`:
+
+```python
+params(learning_rate=0.01, epochs=10, model="resnet")   # shown in the UI *and* logged
+```
+
+A full-notebook run is a *parent* experiment; a partial re-run
+(`nb run file.py:LINE`) is saved as a *child* of the most recent full run. Browse
+history from the index page's per-notebook **Experiments** link (parents
+newest-first, children nested); click a run to view its saved code, params, and
+outputs. See `skills/nb/guide.py` for the `params(...)` example.
+
 ## Cache Management
 
 Caches are invalidated from the command line, not from notebook code.

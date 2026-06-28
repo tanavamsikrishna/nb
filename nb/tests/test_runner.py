@@ -71,7 +71,7 @@ display(x)
         events.append((event_type, event_data))
 
     exec_ns = {}
-    errored = run_notebook(nb_file, exec_ns, emit_event)
+    errored, _, _ = run_notebook(nb_file, exec_ns, emit_event)
 
     assert errored is False
     event_types = [e[0] for e in events]
@@ -100,7 +100,7 @@ print("oops", file=sys.stderr)
     events: List[Tuple[str, dict]] = []
     logs: List[Tuple[str, str]] = []
 
-    errored = run_notebook(
+    errored, _, _ = run_notebook(
         nb_file,
         {},
         lambda t, d: events.append((t, d)),
@@ -120,7 +120,7 @@ def test_run_notebook_log_sink_optional(tmp_path: Path) -> None:
     nb_file = tmp_path / "io_nb.py"
     nb_file.write_text('# %%\nprint("standalone")\n')
 
-    errored = run_notebook(nb_file, {}, lambda t, d: None)
+    errored, _, _ = run_notebook(nb_file, {}, lambda t, d: None)
     assert errored is False
 
 
@@ -138,7 +138,7 @@ def test_run_notebook_syntax_error(tmp_path: Path) -> None:
         events.append((event_type, event_data))
 
     # Should not raise (previously NameError on wall_ms in the except block).
-    errored = run_notebook(nb_file, {}, emit_event, lambda s, d: logs.append((s, d)))
+    errored, _, _ = run_notebook(nb_file, {}, emit_event, lambda s, d: logs.append((s, d)))
 
     assert errored is True
     cell_end = next(d for t, d in events if t == "cell_end")
@@ -189,7 +189,7 @@ def test_run_notebook_partial_reuses_namespace(tmp_path: Path) -> None:
 
     # Re-run only cell 1 (line 5). It reads x from the persisted namespace.
     events: List[Tuple[str, dict]] = []
-    errored = run_notebook(nb_file, ns, lambda t, d: events.append((t, d)), None, (5, 5))
+    errored, _, _ = run_notebook(nb_file, ns, lambda t, d: events.append((t, d)), None, (5, 5))
 
     assert errored is False
     types = [t for t, _ in events]

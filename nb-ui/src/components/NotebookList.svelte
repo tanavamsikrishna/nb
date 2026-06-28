@@ -30,8 +30,12 @@
     }
   }
 
-  function href(path: string): string {
+  function streamHref(path: string): string {
     return "/?path=" + encodeURIComponent(path);
+  }
+
+  function experimentsHref(path: string): string {
+    return "/?view=experiments&path=" + encodeURIComponent(path);
   }
 
   onMount(() => {
@@ -57,16 +61,26 @@
       <ul class="nb-list">
         {#each notebooks as nb (nb.path)}
           <li>
-            <a class="nb-item" href={href(nb.path)}>
+            <div class="nb-item">
               <span class="nb-name">{nb.name}</span>
               <span class="nb-path">{nb.path}</span>
               <span class="nb-meta">
-                <span class="nb-cells"
-                  >{nb.num_cells}
-                  {nb.num_cells === 1 ? "cell" : "cells"}</span
-                >
+                {#if nb.active}
+                  <a class="nb-link" href={streamHref(nb.path)}>
+                    Live stream
+                    <span class="nb-cells"
+                      >· {nb.num_cells}
+                      {nb.num_cells === 1 ? "cell" : "cells"}</span
+                    >
+                  </a>
+                {/if}
+                {#if nb.has_experiments}
+                  <a class="nb-link" href={experimentsHref(nb.path)}>
+                    Experiments
+                  </a>
+                {/if}
               </span>
-            </a>
+            </div>
           </li>
         {/each}
       </ul>
@@ -168,16 +182,18 @@
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-md);
     background: var(--bg-muted);
-    text-decoration: none;
     color: inherit;
-    transition:
-      border-color 0.12s ease,
-      background 0.12s ease;
   }
 
-  .nb-item:hover {
-    border-color: var(--color-primary);
-    background: var(--bg-sunken);
+  .nb-link {
+    font-family: var(--font-sans);
+    color: var(--color-primary);
+    text-decoration: none;
+    font-weight: 600;
+  }
+
+  .nb-link:hover {
+    text-decoration: underline;
   }
 
   .nb-name {

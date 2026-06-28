@@ -178,8 +178,15 @@ def run_notebook(
     emit_event: Callable[[str, dict], None],
     log_sink: LogSink | None = None,
     target_lines: Tuple[int, int] | None = None,
-) -> bool:
-    """Execute the notebook at `path`. Returns True if a cell (or load) errored.
+) -> Tuple[bool, str, list[int]]:
+    """Execute the notebook at `path`. Returns `(errored, run_code, ran_cell_ids)`.
+
+    `errored` is True if a cell (or load) errored. `run_code` is the source to
+    persist for experiment tracking: the whole file for a full run, or only the
+    code of the cells that actually ran for a partial run (empty on a read error).
+    `ran_cell_ids` are the ids of the cells this run executed — the full notebook
+    for a full run, the targeted subset for a partial one (so a saved partial run
+    records only its own cells, not the parent's surviving render state).
 
     `log_sink`, when provided, receives the notebook's stdout/stderr and full
     tracebacks (raw passthrough for the `nb run` terminal); the browser gets
@@ -199,7 +206,7 @@ def run_notebook(
             source = f.read()
     except Exception as e:
         emit_event("run_end", {"status": "error", "error": f"Failed to read file: {e}"})
-        return True
+        return True, "", []
 
     # Inject the exact source we're about to run into linecache, keyed by path.
     # Cells are compiled with file-relative line numbers (see padding below), so
@@ -225,6 +232,17 @@ def run_notebook(
         )
         cells = cells[lo : hi + 1]
 
+    # Source to persist for experiment tracking: the whole file for a full run,
+    # or only the run cells (with their headers reconstructed) for a partial run.
+    if partial:
+        run_code = "\n\n".join(f"# %% {cell.title}\n{cell.code}" for cell in cells)
+    else:
+        run_code = source
+    # Filled as cells actually execute (not upfront), so a run that errors partway
+    # records only the cells that ran — the trailing, never-executed cells are
+    # excluded from the saved experiment's cell_ids.
+    ran_cell_ids: list[int] = []
+
     # A partial run leaves the notebook header untouched (path/docstring haven't
     # changed); emitting it would reset the daemon's notebook_state. A full run
     # always emits, even without a docstring, so the frontend receives the path.
@@ -243,6 +261,7 @@ def run_notebook(
     exec_ns.setdefault("__name__", "__main__")
     exec_ns.setdefault("__builtins__", __builtins__)
     exec_ns.setdefault("display", fw.display)
+    exec_ns.setdefault("params", fw.params)
     exec_ns.setdefault("nb_cache", fw.nb_cache)
 
     old_emitter = fw._active_emitter
@@ -279,6 +298,7 @@ def run_notebook(
 
             # Tag the cell so display primitives know which cell they belong to.
             fw._current_cell_id = cell.id
+            ran_cell_ids.append(cell.id)
 
             # Default so the except block has values even if compile() raises
             # (e.g. a SyntaxError in the cell) before timing starts.
@@ -331,10 +351,10 @@ def run_notebook(
 
                 emit_event("run_end", {"status": "error"})
                 errored = True
-                return errored
+                return errored, run_code, ran_cell_ids
 
         emit_event("run_end", {"status": "ok"})
-        return errored
+        return errored, run_code, ran_cell_ids
     finally:
         fw._current_cell_id = None
         if installed_runner_emitter:
