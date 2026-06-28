@@ -9,6 +9,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import type { NotebookListItem, NotebooksResponse } from "../lib/types";
+  import AppShell from "./AppShell.svelte";
 
   let notebooks = $state<NotebookListItem[]>([]);
   let loaded = $state(false);
@@ -45,126 +46,56 @@
   });
 </script>
 
-<div class="app-wrapper">
-  <header class="app-header">
-    <div class="header-content">
-      <div class="logo-area">
-        <span class="logo-nb">nb</span>
-        <span class="logo-separator">/</span>
-        <span class="logo-sub">notebooks</span>
-      </div>
-    </div>
-  </header>
+<AppShell>
+  {#snippet breadcrumb()}
+    <span class="logo-nb">nb</span>
+    <span class="logo-separator">/</span>
+    <span class="logo-sub">notebooks</span>
+  {/snippet}
 
-  <main class="main-container">
-    {#if loaded && notebooks.length > 0}
-      <ul class="nb-list">
-        {#each notebooks as nb (nb.path)}
-          <li>
-            <div class="nb-item">
-              <span class="nb-name">{nb.name}</span>
-              <span class="nb-path">{nb.path}</span>
-              <span class="nb-meta">
-                {#if nb.active}
-                  <a class="nb-link" href={streamHref(nb.path)}>
-                    Live stream
-                    <span class="nb-cells"
-                      >· {nb.num_cells}
-                      {nb.num_cells === 1 ? "cell" : "cells"}</span
-                    >
-                  </a>
-                {/if}
-                {#if nb.has_experiments}
-                  <a class="nb-link" href={experimentsHref(nb.path)}>
-                    Experiments
-                  </a>
-                {/if}
-              </span>
-            </div>
-          </li>
-        {/each}
-      </ul>
-    {:else if loaded}
-      <div class="empty-state">
-        <h2>No notebooks yet</h2>
-        {#if failed}
-          <p>Couldn't reach the daemon. Is it running?</p>
-        {:else}
-          <p>Run a notebook to see it here:</p>
-          <code class="cmd-example"
-            >nb run <span class="arg">my_notebook.py</span></code
-          >
-        {/if}
-      </div>
-    {/if}
-  </main>
-</div>
+  {#if loaded && notebooks.length > 0}
+    <ul class="nb-list">
+      {#each notebooks as nb (nb.path)}
+        <li>
+          <div class="nb-item">
+            <span class="nb-name">{nb.name}</span>
+            <span class="nb-path">{nb.path}</span>
+            <span class="nb-meta">
+              {#if nb.active}
+                <a class="nb-link" href={streamHref(nb.path)}>
+                  Live stream
+                  <span class="nb-cells"
+                    >· {nb.num_cells}
+                    {nb.num_cells === 1 ? "cell" : "cells"}</span
+                  >
+                </a>
+              {/if}
+              {#if nb.has_experiments}
+                <a class="nb-link" href={experimentsHref(nb.path)}>
+                  Experiments
+                </a>
+              {/if}
+            </span>
+          </div>
+        </li>
+      {/each}
+    </ul>
+  {:else if loaded}
+    <div class="empty-state">
+      <h2>No notebooks yet</h2>
+      {#if failed}
+        <p>Couldn't reach the daemon. Is it running?</p>
+      {:else}
+        <p>Run a notebook to see it here:</p>
+        <code class="cmd-example"
+          >nb run <span class="arg">my_notebook.py</span></code
+        >
+      {/if}
+    </div>
+  {/if}
+</AppShell>
 
 <style>
-  .app-wrapper {
-    display: flex;
-    flex-direction: column;
-    min-height: 100vh;
-  }
-
-  .app-header {
-    background: var(--bg-header);
-    border-bottom: 1px solid var(--border-default);
-    position: sticky;
-    top: 0;
-    z-index: 50;
-  }
-
-  .header-content {
-    max-width: 960px;
-    margin: 0 auto;
-    padding: 16px 24px;
-    display: flex;
-    align-items: center;
-  }
-
-  .logo-area {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-weight: 700;
-    font-family: var(--font-sans);
-  }
-
-  .logo-nb {
-    font-size: 1.5rem;
-    background: linear-gradient(
-      135deg,
-      var(--color-primary) 0%,
-      var(--color-secondary) 100%
-    );
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    letter-spacing: -0.05em;
-  }
-
-  .logo-separator {
-    color: var(--border-default);
-    font-weight: 300;
-  }
-
-  .logo-sub {
-    font-size: 0.875rem;
-    color: var(--fg-secondary);
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-  }
-
-  .main-container {
-    max-width: 960px;
-    width: 100%;
-    margin: 0 auto;
-    padding: 40px 24px;
-    flex-grow: 1;
-    box-sizing: border-box;
-  }
-
   .nb-list {
     list-style: none;
     margin: 0;
@@ -219,49 +150,6 @@
     margin-top: 4px;
     font-family: var(--font-sans);
     font-size: 0.75rem;
-    color: var(--fg-secondary);
-  }
-
-  .empty-state {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    background: var(--bg-muted);
-    border: 1px dashed var(--border-subtle);
-    border-radius: var(--radius-xl);
-    padding: 60px 40px;
-    margin-top: 40px;
-  }
-
-  .empty-state h2 {
-    font-size: 1.5rem;
-    font-weight: 600;
-    margin: 0 0 12px;
-    color: var(--fg-primary);
-    font-family: var(--font-sans);
-  }
-
-  .empty-state p {
-    color: var(--fg-secondary);
-    max-width: 400px;
-    font-size: 0.95rem;
-    line-height: 1.6;
-    margin: 0 0 24px;
-  }
-
-  .cmd-example {
-    font-family: var(--font-mono);
-    font-size: 0.9rem;
-    background: var(--bg-sunken);
-    border: 1px solid var(--border-subtle);
-    padding: 10px 20px;
-    border-radius: var(--radius-md);
-    color: var(--color-primary);
-  }
-
-  .cmd-example .arg {
     color: var(--fg-secondary);
   }
 </style>
