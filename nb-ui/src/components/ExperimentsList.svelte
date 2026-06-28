@@ -97,7 +97,6 @@
 {#snippet runRow(run: ExperimentRun, isChild: boolean)}
   <a class="run-item {isChild ? 'child' : ''}" href={runHref(run.run_id)}>
     <span class="run-top">
-      <span class="run-kind {run.kind}">{run.kind}</span>
       <span class="run-status {run.status}">{run.status}</span>
       <span class="run-when">{when(run.started_at)}</span>
       <span class="run-dur">{duration(run.dur_ms)}</span>
@@ -163,21 +162,6 @@
     gap: 10px;
     font-family: var(--font-sans);
     font-size: 0.8rem;
-  }
-
-  .run-kind {
-    font-weight: 600;
-    text-transform: uppercase;
-    font-size: 0.7rem;
-    letter-spacing: 0.05em;
-    padding: 2px 8px;
-    border-radius: var(--radius-full);
-    background: var(--bg-sunken);
-    color: var(--fg-secondary);
-  }
-
-  .run-kind.full {
-    color: var(--color-primary);
   }
 
   .run-status {

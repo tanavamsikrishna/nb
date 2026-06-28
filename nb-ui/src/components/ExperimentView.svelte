@@ -21,7 +21,7 @@
   // and looping forever (the live page avoids this by using plain store objects,
   // not runes). $state.raw keeps the nested cells/records as plain objects while
   // still re-rendering when `detail` is reassigned.
-  let detail = $state.raw<ExperimentDetail | null>(null);
+  let experimentDetail = $state.raw<ExperimentDetail | null>(null);
   let loaded = $state(false);
   let failed = $state(false);
 
@@ -45,7 +45,7 @@
           encodeURIComponent(runId),
       );
       if (!resp.ok) throw new Error(String(resp.status));
-      detail = (await resp.json()) as ExperimentDetail;
+      experimentDetail = (await resp.json()) as ExperimentDetail;
       failed = false;
     } catch {
       failed = true;
@@ -66,20 +66,21 @@
     <span class="notebook-name">{name}</span>
   {/snippet}
 
-  {#if loaded && detail}
+  {#if loaded && experimentDetail}
     <div class="run-meta">
-      <span class="run-kind {detail.meta.kind}">{detail.meta.kind}</span>
-      <span class="run-status {detail.meta.status}">{detail.meta.status}</span>
-      <span class="run-when">{when(detail.meta.started_at)}</span>
-      <span class="run-id">{detail.meta.run_id}</span>
+      <span class="run-status {experimentDetail.meta.status}"
+        >{experimentDetail.meta.status}</span
+      >
+      <span class="run-when">{when(experimentDetail.meta.started_at)}</span>
+      <span class="run-id">{experimentDetail.meta.run_id}</span>
     </div>
 
-    {#if Object.keys(detail.meta.params).length > 0}
+    {#if Object.keys(experimentDetail.meta.params).length > 0}
       <section class="block">
         <h3>Parameters</h3>
         <table class="params-table">
           <tbody>
-            {#each Object.entries(detail.meta.params) as [key, value]}
+            {#each Object.entries(experimentDetail.meta.params) as [key, value]}
               <tr>
                 <th>{key}</th>
                 <td
@@ -95,9 +96,9 @@
     {/if}
 
     <NotebookView
-      cells={detail.cells}
-      docstring={detail.docstring}
-      code={detail.code}
+      cells={experimentDetail.cells}
+      docstring={experimentDetail.docstring}
+      code={experimentDetail.code}
     />
   {:else if loaded}
     <div class="empty-state">
@@ -117,21 +118,6 @@
     font-family: var(--font-sans);
     font-size: 0.85rem;
     margin-bottom: 24px;
-  }
-
-  .run-kind {
-    font-weight: 600;
-    text-transform: uppercase;
-    font-size: 0.7rem;
-    letter-spacing: 0.05em;
-    padding: 2px 8px;
-    border-radius: var(--radius-full);
-    background: var(--bg-sunken);
-    color: var(--fg-secondary);
-  }
-
-  .run-kind.full {
-    color: var(--color-primary);
   }
 
   .run-status {
