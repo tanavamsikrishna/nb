@@ -53,6 +53,27 @@ class NotebookEntry(msgspec.Struct):
     has_experiments: bool
 
 
+class RenderedTable(msgspec.Struct, tag_field="type", tag="table", omit_defaults=True):
+    schema: dict[str, str]
+    rows: int
+    preview: str
+    label: str | None
+    path: str | None = None
+
+
+class RenderedSpilled(msgspec.Struct):
+    type: str
+    path: str
+
+
+class RenderedInline(msgspec.Struct):
+    type: str
+    content: Any
+
+
+RenderedRecord = RenderedTable | RenderedSpilled | RenderedInline
+
+
 # Project root the daemon serves, set once in `main`. Experiments are persisted
 # under `<_project_dir>/.nb/experiments` and listed/loaded from there.
 _project_dir: Path = Path.cwd()
@@ -471,7 +492,7 @@ def _spill(session: NotebookSession, tag: str, n: int, suffix: str, data: bytes)
     return str(fpath)
 
 
-def _render_record(record: CellRecord, session: NotebookSession, tag: str, n: int) -> dict:
+def _render_record(record: CellRecord, session: NotebookSession, tag: str, n: int) -> RenderedRecord:
     """Map one display record to a query-reply entry.
 
     - table: always returns `schema` (column -> dtype) and a CSV `preview` of the
@@ -489,22 +510,26 @@ def _render_record(record: CellRecord, session: NotebookSession, tag: str, n: in
 
         df = pl.read_parquet(io.BytesIO(base64.b64decode(payload["data"])))
         total = payload.get("total_rows", df.height)
-        out = {
-            "type": "table",
-            "schema": {name: str(dtype) for name, dtype in zip(df.columns, df.dtypes)},
-            "rows": total,
-            "preview": df.head(_TABLE_PREVIEW_ROWS).write_csv(),
-            "label": payload.get("label"),
-        }
-        if total > _TABLE_PREVIEW_ROWS:  # the preview is a head(); spill the rest as CSV
-            out["path"] = _spill(session, tag, n, ".csv", df.write_csv().encode("utf-8"))
-        return out
+        spill_path = (
+            _spill(session, tag, n, ".csv", df.write_csv().encode("utf-8"))
+            if total > _TABLE_PREVIEW_ROWS
+            else None
+        )
+        return RenderedTable(
+            schema={name: str(dtype) for name, dtype in zip(df.columns, df.dtypes)},
+            rows=total,
+            preview=df.head(_TABLE_PREVIEW_ROWS).write_csv(),
+            label=payload.get("label"),
+            path=spill_path,
+        )
 
     if rtype in ("plotly", "altair"):
-        text = json.dumps(payload)
-        return {"type": rtype, "path": _spill(session, tag, n, ".json", text.encode("utf-8"))}
+        return RenderedSpilled(
+            type=rtype,
+            path=_spill(session, tag, n, ".json", json.dumps(payload).encode("utf-8")),
+        )
 
-    return {"type": rtype, "content": payload}
+    return RenderedInline(type=rtype, content=payload)
 
 
 def _query_records(session: NotebookSession, cell_id: int | None) -> dict:
@@ -581,7 +606,7 @@ async def _handle_query(req: dict, writer: asyncio.StreamWriter) -> None:
         else:
             reply = {"status": "error", "message": f"Unknown query op: {op!r}."}
 
-    writer.write(json.dumps(reply).encode("utf-8") + b"\n")
+    writer.write(msgspec.json.encode(reply) + b"\n")
     await writer.drain()
 
 
