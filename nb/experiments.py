@@ -30,7 +30,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+import msgspec
+
 EXPERIMENTS_SUBDIR = (".nb", "experiments")
+
+
+class NotebookInfo(msgspec.Struct):
+    path: str
+    name: str
+    run_count: int
 
 # run_id is minted by us and only ever travels back as an opaque token; still,
 # validate it before joining onto a filesystem path (it arrives over HTTP).
@@ -63,9 +71,9 @@ def _collect_params(cells: list[Any]) -> dict:
     """Merge every ``params(...)`` record across the run's cells into one dict."""
     out: dict = {}
     for cell in cells:
-        for rec in cell.get("records", []):
-            if rec.get("type") == "params" and isinstance(rec.get("payload"), dict):
-                out.update(rec["payload"])
+        for rec in cell.records:
+            if rec.type == "params" and isinstance(rec.payload, dict):
+                out.update(rec.payload)
     return out
 
 
@@ -110,19 +118,21 @@ def save_run(
         "dur_ms": dur_ms,
         "status": status,
         "error": error,
-        "cell_ids": [c["id"] for c in cells],
+        "cell_ids": [c.id for c in cells],
         "params": _collect_params(cells),
     }
     (run_dir / "meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
     (run_dir / "code.py").write_text(code, encoding="utf-8")
-    (run_dir / "records.json").write_text(json.dumps(cells), encoding="utf-8")
+    (run_dir / "records.json").write_text(
+        msgspec.json.encode(cells).decode("utf-8"), encoding="utf-8"
+    )
     return run_id
 
 
-def list_notebooks(root: Any) -> list[dict]:
+def list_notebooks(root: Any) -> list[NotebookInfo]:
     """Every notebook that has at least one stored experiment."""
     store = _store_dir(root)
-    out: list[dict] = []
+    out: list[NotebookInfo] = []
     if not store.is_dir():
         return out
     for nb_dir in store.iterdir():
@@ -134,7 +144,7 @@ def list_notebooks(root: Any) -> list[dict]:
         except (OSError, json.JSONDecodeError):
             continue
         run_count = sum(1 for d in nb_dir.iterdir() if d.is_dir() and (d / "meta.json").is_file())
-        out.append({"path": info["path"], "name": info["name"], "run_count": run_count})
+        out.append(NotebookInfo(path=info["path"], name=info["name"], run_count=run_count))
     return out
 
 

@@ -5,21 +5,20 @@ import pickle
 import types
 from contextlib import contextmanager
 from contextvars import ContextVar
-from dataclasses import dataclass
 from functools import wraps
 from typing import Any, Callable, Generator, Literal, TypeVar, cast, overload
+
+import msgspec
 
 F = TypeVar("F", bound=Callable)
 
 
-@dataclass
-class DisplayRecord:
+class DisplayRecord(msgspec.Struct):
     type: str
     payload: Any
 
 
-@dataclass
-class CacheEntry:
+class CacheEntry(msgspec.Struct):
     result: Any
     display_records: list[DisplayRecord]
     name: str = ""
@@ -78,8 +77,8 @@ def _serialize_table(df: Any, label: str | None = None) -> dict:
 
 
 def _serialize_object(obj: Any) -> Any:
-    if hasattr(obj, "model_dump") and callable(obj.model_dump):
-        obj = obj.model_dump()
+    if isinstance(obj, msgspec.Struct):
+        return json.loads(msgspec.json.encode(obj))
 
     try:
         return json.loads(json.dumps(obj))
@@ -234,16 +233,8 @@ def _hash_value(obj: Any) -> bytes:
     except ImportError:
         pass
 
-    try:
-        from pydantic import BaseModel
-
-        if isinstance(obj, BaseModel):
-            if hasattr(obj, "model_dump_json") and callable(obj.model_dump_json):
-                return obj.model_dump_json().encode("utf-8")
-            elif hasattr(obj, "json") and callable(obj.json):
-                return obj.json().encode("utf-8")
-    except ImportError:
-        pass
+    if isinstance(obj, msgspec.Struct):
+        return msgspec.json.encode(obj)
 
     # Only notebook-defined functions are hashable: their logic lives in the
     # notebook, so a change to it should invalidate the cache.

@@ -1,9 +1,9 @@
 import types
 
+import msgspec
 import numpy as np
 import polars as pl
 import pytest
-from pydantic import BaseModel
 
 import nb.framework as fw
 from nb.framework import (
@@ -50,7 +50,7 @@ def test_hash_value() -> None:
     assert _hash_value(df1) == _hash_value(df2)
     assert _hash_value(df1) != _hash_value(df3)
 
-    class Model(BaseModel):
+    class Model(msgspec.Struct):
         val: int
 
     m1 = Model(val=10)

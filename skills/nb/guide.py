@@ -71,7 +71,7 @@ display(get_data(1), label="My Table")
 # strings -- a `str` is auto-detected as plain text
 display("Hello")
 
-# Object (json, yaml, python dict, pydantic model, etc.) -- any non-str, non-special
+# Object (json, yaml, python dict, etc.) -- any non-str, non-special
 # value auto-detects as an object (JSON-serialized, shown in a collapsible tree).
 # Pass as_="object" to force it (e.g. to render a str as a JSON object).
 # Serialization happens at display() time — later mutations are not visible.

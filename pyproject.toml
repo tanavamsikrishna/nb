@@ -7,13 +7,14 @@ requires-python = ">=3.13"
 dependencies = [
   "aiohttp",
   "click",
+  "msgspec>=0.21.1",
 ]
 
 [project.scripts]
 nb = "nb.cli:main"
 
 [project.optional-dependencies]
-all = ["polars", "numpy", "pydantic", "plotly", "altair"]
+all = ["polars", "numpy", "plotly", "altair"]
 altair = ["altair"]
 dev = [
   "pytest",
@@ -22,7 +23,6 @@ dev = [
 numpy = ["numpy"]
 plotly = ["plotly"]
 polars = ["polars"]
-pydantic = ["pydantic"]
 
 [build-system]
 requires = ["hatchling"]

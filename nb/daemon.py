@@ -16,25 +16,26 @@ import webbrowser
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Set, TypedDict
+from typing import Any, Set
 
+import msgspec
 from aiohttp import web
 
 import nb.framework as fw
 from nb import experiments, runner
 
 
-class CellRecord(TypedDict):
+class CellRecord(msgspec.Struct):
     type: str
     payload: Any
 
 
-class CellProfiling(TypedDict):
+class CellProfiling(msgspec.Struct):
     wall_ms: float | None
     cpu_ms: float | None
 
 
-class CellState(TypedDict):
+class CellState(msgspec.Struct):
     id: int
     title: str | None
     source_line: int | None
@@ -42,6 +43,14 @@ class CellState(TypedDict):
     stale: bool
     profiling: CellProfiling | None
     records: list[CellRecord]
+
+
+class NotebookEntry(msgspec.Struct):
+    path: str
+    name: str
+    num_cells: int
+    active: bool
+    has_experiments: bool
 
 
 # Project root the daemon serves, set once in `main`. Experiments are persisted
@@ -138,21 +147,10 @@ def _fresh_exec_ns() -> dict:
 
 def _state_find_cell(cells: list[CellState], cell_id: int | None) -> CellState | None:
     for cell in cells:
-        if cell["id"] == cell_id:
+        if cell.id == cell_id:
             return cell
     return None
 
-
-def _new_cell_state(cell_id: int, title: str | None = None) -> CellState:
-    return {
-        "id": cell_id,
-        "title": title,
-        "source_line": None,
-        "status": "pending",
-        "stale": False,
-        "profiling": None,
-        "records": [],
-    }
 
 
 def _fold_state(event_type: str, data: dict, path: str) -> None:
@@ -177,50 +175,50 @@ def _fold_state(event_type: str, data: dict, path: str) -> None:
             for item in manifest:
                 cell = _state_find_cell(cells, item["id"])
                 if cell is None:
-                    cell = _new_cell_state(item["id"], item.get("title"))
+                    cell = CellState(id=item["id"], title=item.get("title"), source_line=None, status="pending", stale=False, profiling=None, records=[])
                     cells.append(cell)
-                cell["title"] = item.get("title", cell["title"])
-                cell["stale"] = True
-                cell["status"] = "pending"
-            cells.sort(key=lambda c: c["id"])
+                cell.title = item.get("title", cell.title)
+                cell.stale = True
+                cell.status = "pending"
+            cells.sort(key=lambda c: c.id)
         else:
             # Full run: rebuild the cell list to the manifest, preserving the
             # records of surviving ids and dropping absent ones (mirrors the
             # frontend reconcile + finalizeRun, resolved immediately).
-            existing = {c["id"]: c for c in cells}
+            existing = {c.id: c for c in cells}
             rebuilt = []
             for item in manifest:
                 cell = existing.get(item["id"])
                 if cell is None:
-                    cell = _new_cell_state(item["id"], item.get("title"))
+                    cell = CellState(id=item["id"], title=item.get("title"), source_line=None, status="pending", stale=False, profiling=None, records=[])
                 else:
-                    cell["title"] = item.get("title", cell["title"])
-                    cell["stale"] = True
-                    cell["status"] = "pending"
+                    cell.title = item.get("title", cell.title)
+                    cell.stale = True
+                    cell.status = "pending"
                 rebuilt.append(cell)
-            rebuilt.sort(key=lambda c: c["id"])
+            rebuilt.sort(key=lambda c: c.id)
             session.cells = rebuilt
     elif event_type == "cell_start":
         cell = _state_find_cell(cells, data["cell_id"])
         if cell is None:
-            cell = _new_cell_state(data["cell_id"], data.get("title"))
+            cell = CellState(id=data["cell_id"], title=data.get("title"), source_line=None, status="pending", stale=False, profiling=None, records=[])
             cells.append(cell)
-            cells.sort(key=lambda c: c["id"])
-        cell["status"] = "running"
-        cell["stale"] = False
-        cell["title"] = data.get("title", cell["title"])
-        cell["source_line"] = data.get("source_line", cell["source_line"])
-        cell["profiling"] = None
-        cell["records"] = []
+            cells.sort(key=lambda c: c.id)
+        cell.status = "running"
+        cell.stale = False
+        cell.title = data.get("title", cell.title)
+        cell.source_line = data.get("source_line", cell.source_line)
+        cell.profiling = None
+        cell.records = []
     elif event_type == "display_record":
         cell = _state_find_cell(cells, data["cell_id"])
         if cell is not None:
-            cell["records"].append({"type": data["type"], "payload": data["payload"]})
+            cell.records.append(CellRecord(type=data["type"], payload=data["payload"]))
     elif event_type == "cell_end":
         cell = _state_find_cell(cells, data["cell_id"])
         if cell is not None:
-            cell["status"] = data.get("status", "ok")
-            cell["profiling"] = {"wall_ms": data.get("wall_ms"), "cpu_ms": data.get("cpu_ms")}
+            cell.status = data.get("status", "ok")
+            cell.profiling = CellProfiling(wall_ms=data.get("wall_ms"), cpu_ms=data.get("cpu_ms"))
 
 
 def _snapshot_events(session: NotebookSession | None) -> list[dict]:
@@ -239,7 +237,7 @@ def _snapshot_events(session: NotebookSession | None) -> list[dict]:
         header["code"] = session.code
     events.append({"event": "notebook_header", "data": header})
 
-    manifest = [{"id": c["id"], "title": c["title"] or ""} for c in session.cells]
+    manifest = [{"id": c.id, "title": c.title or ""} for c in session.cells]
     events.append({"event": "run_start", "data": {"cell_manifest": manifest, "partial": False}})
 
     for cell in session.cells:
@@ -247,34 +245,34 @@ def _snapshot_events(session: NotebookSession | None) -> list[dict]:
             {
                 "event": "cell_start",
                 "data": {
-                    "cell_id": cell["id"],
-                    "source_line": cell["source_line"],
-                    "title": cell["title"] or "",
+                    "cell_id": cell.id,
+                    "source_line": cell.source_line,
+                    "title": cell.title or "",
                 },
             }
         )
-        for record in cell["records"]:
+        for record in cell.records:
             events.append(
                 {
                     "event": "display_record",
                     "data": {
-                        "cell_id": cell["id"],
-                        "type": record["type"],
-                        "payload": record["payload"],
+                        "cell_id": cell.id,
+                        "type": record.type,
+                        "payload": record.payload,
                     },
                 }
             )
-        profiling = cell["profiling"] or {}
+        profiling = cell.profiling
         # Coerce a non-terminal status (a cell still running/pending when the
         # client connected) to "ok"; the subsequent live events correct it.
-        status = cell["status"] if cell["status"] in ("ok", "error") else "ok"
+        status = cell.status if cell.status in ("ok", "error") else "ok"
         events.append(
             {
                 "event": "cell_end",
                 "data": {
-                    "cell_id": cell["id"],
-                    "wall_ms": profiling.get("wall_ms", 0),
-                    "cpu_ms": profiling.get("cpu_ms", 0),
+                    "cell_id": cell.id,
+                    "wall_ms": (profiling.wall_ms or 0) if profiling else 0,
+                    "cpu_ms": (profiling.cpu_ms or 0) if profiling else 0,
                     "status": status,
                 },
             }
@@ -357,29 +355,33 @@ async def notebooks_handler(request: web.Request) -> web.Response:
     holds live state for (streamable at `/?path=<path>`) and those with stored
     experiments (browsable at `/?view=experiments&path=<path>`) even when no
     session is live. `num_cells` is 0 for an experiments-only notebook."""
-    by_path: dict[str, dict] = {}
+    by_path: dict[str, NotebookEntry] = {}
     for path, session in _sessions.items():
-        by_path[path] = {
-            "path": path,
-            "name": os.path.basename(path),
-            "num_cells": len(session.cells),
-            "active": True,
-            "has_experiments": False,
-        }
+        by_path[path] = NotebookEntry(
+            path=path,
+            name=os.path.basename(path),
+            num_cells=len(session.cells),
+            active=True,
+            has_experiments=False,
+        )
     for nb in experiments.list_notebooks(_project_dir):
-        entry = by_path.get(nb["path"])
+        entry = by_path.get(nb.path)
         if entry is None:
-            entry = {
-                "path": nb["path"],
-                "name": nb["name"],
-                "num_cells": 0,
-                "active": False,
-            }
-            by_path[nb["path"]] = entry
-        entry["has_experiments"] = nb["run_count"] > 0
+            entry = NotebookEntry(
+                path=nb.path,
+                name=nb.name,
+                num_cells=0,
+                active=False,
+                has_experiments=False,
+            )
+            by_path[nb.path] = entry
+        entry.has_experiments = nb.run_count > 0
 
-    notebooks = sorted(by_path.values(), key=lambda nb: nb["path"])
-    return web.json_response({"notebooks": notebooks})
+    notebooks = sorted(by_path.values(), key=lambda nb: nb.path)
+    return web.Response(
+        body=msgspec.json.encode({"notebooks": notebooks}),
+        content_type="application/json",
+    )
 
 
 async def experiments_handler(request: web.Request) -> web.Response:
@@ -430,7 +432,7 @@ def _query_cells(session: NotebookSession) -> dict:
         total_lines = None
 
     # Header line of each cell (the `# %%` line), in order.
-    headers = [(c["source_line"] - 1) if c["source_line"] is not None else None for c in cells]
+    headers = [(c.source_line - 1) if c.source_line is not None else None for c in cells]
     out = []
     for i, cell in enumerate(cells):
         start = headers[i]
@@ -440,12 +442,12 @@ def _query_cells(session: NotebookSession) -> dict:
             end = (nxt - 1) if nxt is not None else total_lines
         out.append(
             {
-                "id": cell["id"],
-                "title": cell["title"],
+                "id": cell.id,
+                "title": cell.title,
                 "start_line": start,
                 "end_line": end,
-                "status": cell["status"],
-                "records": len(cell["records"]),
+                "status": cell.status,
+                "records": len(cell.records),
             }
         )
     return {"status": "ok", "count": len(out), "cells": out}
@@ -479,8 +481,8 @@ def _render_record(record: CellRecord, session: NotebookSession, tag: str, n: in
     - plotly/altair: the spec is not human-readable, so it is always written to a
       JSON file and only the `path` is returned.
     - everything else (text/md/html/object): inlined as-is."""
-    rtype = record["type"]
-    payload = record["payload"]
+    rtype = record.type
+    payload = record.payload
 
     if rtype == "table":
         import polars as pl  # present in-process: a table record means polars made it
@@ -508,10 +510,10 @@ def _render_record(record: CellRecord, session: NotebookSession, tag: str, n: in
 def _query_records(session: NotebookSession, cell_id: int | None) -> dict:
     cell = _state_find_cell(session.cells, cell_id)
     if cell is None:
-        ids = [c["id"] for c in session.cells]
+        ids = [c.id for c in session.cells]
         return {"status": "error", "message": f"No cell {cell_id}. Available cells: {ids}"}
-    cid = cell["id"]
-    records = [_render_record(r, session, f"c{cid}", n) for n, r in enumerate(cell["records"])]
+    cid = cell.id
+    records = [_render_record(r, session, f"c{cid}", n) for n, r in enumerate(cell.records)]
     return {"status": "ok", "cell": cid, "records": records}
 
 
@@ -535,7 +537,7 @@ def _exec_in_ns(session: NotebookSession, code: str) -> dict:
     finally:
         fw._active_emitter = old_emitter
     records = [
-        _render_record({"type": r.type, "payload": r.payload}, session, "exec", n)
+        _render_record(CellRecord(type=r.type, payload=r.payload), session, "exec", n)
         for n, r in enumerate(captured)
     ]
     return {
@@ -720,7 +722,7 @@ async def handle_ipc_client(reader: asyncio.StreamReader, writer: asyncio.Stream
                     # save only the cells this run actually executed (spec: a child
                     # run records only its own cells, not the parent's).
                     ran_ids = set(ran_cell_ids)
-                    saved_cells = [c for c in session.cells if c["id"] in ran_ids]
+                    saved_cells = [c for c in session.cells if c.id in ran_ids]
                     try:
                         saved_id = experiments.save_run(
                             _project_dir,

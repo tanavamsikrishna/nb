@@ -9,6 +9,7 @@ import aiohttp
 import pytest
 
 import nb.daemon as daemon
+from nb.daemon import CellRecord
 
 
 def _snapshot_payloads(session) -> list:
@@ -150,9 +151,9 @@ def test_notebook_state_folds_full_then_partial_run() -> None:
     session = _emit_full_run("/tmp/nb.py", [(0, "a", "hello"), (1, "b", 15)])
 
     cells = session.cells
-    assert [c["id"] for c in cells] == [0, 1]
-    assert cells[0]["records"] == [{"type": "object", "payload": "hello"}]
-    assert cells[1]["records"] == [{"type": "object", "payload": 15}]
+    assert [c.id for c in cells] == [0, 1]
+    assert cells[0].records == [CellRecord(type="object", payload="hello")]
+    assert cells[1].records == [CellRecord(type="object", payload=15)]
 
     # Partial re-run of cell 1 only, producing new output.
     daemon.emit_event(
@@ -169,8 +170,8 @@ def test_notebook_state_folds_full_then_partial_run() -> None:
 
     cells = session.cells
     # Cell 0 untouched; cell 1 carries the re-run's output.
-    assert cells[0]["records"] == [{"type": "object", "payload": "hello"}]
-    assert cells[1]["records"] == [{"type": "object", "payload": 99}]
+    assert cells[0].records == [CellRecord(type="object", payload="hello")]
+    assert cells[1].records == [CellRecord(type="object", payload=99)]
 
 
 def test_snapshot_reproduces_state_without_transient_events() -> None:
@@ -272,8 +273,8 @@ def test_partial_run_folds_into_its_own_session_not_the_active_one() -> None:
 
     a_cells = daemon._sessions["/tmp/a.py"].cells
     b_cells = daemon._sessions["/tmp/b.py"].cells
-    assert a_cells[1]["records"] == [{"type": "object", "payload": "A1*"}]  # A updated
-    assert b_cells[1]["records"] == [{"type": "object", "payload": "B1"}]  # B untouched
+    assert a_cells[1].records == [CellRecord(type="object", payload="A1*")]  # A updated
+    assert b_cells[1].records == [CellRecord(type="object", payload="B1")]  # B untouched
 
     # B's snapshot is unaffected by A's partial re-run.
     b_payloads = {

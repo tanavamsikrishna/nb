@@ -1,22 +1,27 @@
+import json
 from pathlib import Path
+
+import msgspec
 
 import nb.framework as fw
 from nb import experiments
+from nb.daemon import CellProfiling, CellRecord, CellState
 
 
-def _cell(cell_id: int, records: list[dict], *, title: str = "", status: str = "ok") -> dict:
+def _cell(cell_id: int, records: list[dict], *, title: str = "", status: str = "ok") -> CellState:
     """Build a cell in the daemon's `session.cells` render-state shape."""
-    return {
-        "id": cell_id,
-        "title": title,
-        "source_line": cell_id * 3 + 2,
-        "status": status,
-        "profiling": {"wall_ms": 1, "cpu_ms": 1},
-        "records": records,
-    }
+    return CellState(
+        id=cell_id,
+        title=title,
+        source_line=cell_id * 3 + 2,
+        status=status,
+        stale=False,
+        profiling=CellProfiling(wall_ms=1.0, cpu_ms=1.0),
+        records=[CellRecord(type=r["type"], payload=r["payload"]) for r in records],
+    )
 
 
-def _save_full(root: Path, nb_path: str, cells: list[dict], code: str = "# %%\nx = 1\n") -> str:
+def _save_full(root: Path, nb_path: str, cells: list[CellState], code: str = "# %%\nx = 1\n") -> str:
     return experiments.save_run(
         root,
         nb_path,
@@ -39,7 +44,7 @@ def test_save_and_load_run(tmp_path: Path) -> None:
     loaded = experiments.load_run(tmp_path, nb_path, run_id)
     assert loaded is not None
     assert loaded["code"] == "# %%\nx = 1\n"
-    assert loaded["cells"] == cells
+    assert loaded["cells"] == json.loads(msgspec.json.encode(cells))
     assert loaded["meta"]["run_id"] == run_id
     assert loaded["meta"]["kind"] == "full"
     assert loaded["meta"]["parent_run_id"] is None
@@ -65,17 +70,17 @@ def test_list_notebooks(tmp_path: Path) -> None:
     _save_full(tmp_path, "/proj/a.py", [_cell(0, [])])
     _save_full(tmp_path, "/proj/b.py", [_cell(0, [])])
 
-    nbs = {nb["path"]: nb for nb in experiments.list_notebooks(tmp_path)}
+    nbs = {nb.path: nb for nb in experiments.list_notebooks(tmp_path)}
     assert set(nbs) == {"/proj/a.py", "/proj/b.py"}
-    assert nbs["/proj/a.py"]["run_count"] == 2
-    assert nbs["/proj/a.py"]["name"] == "a.py"
-    assert nbs["/proj/b.py"]["run_count"] == 1
+    assert nbs["/proj/a.py"].run_count == 2
+    assert nbs["/proj/a.py"].name == "a.py"
+    assert nbs["/proj/b.py"].run_count == 1
 
 
 def test_same_basename_different_dirs_dont_collide(tmp_path: Path) -> None:
     _save_full(tmp_path, "/proj/one/example.py", [_cell(0, [])])
     _save_full(tmp_path, "/proj/two/example.py", [_cell(0, [])])
-    paths = {nb["path"] for nb in experiments.list_notebooks(tmp_path)}
+    paths = {nb.path for nb in experiments.list_notebooks(tmp_path)}
     assert paths == {"/proj/one/example.py", "/proj/two/example.py"}
 
 
