@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to AI coding agents when working with code in this repository.
 
 ## What this is
 
@@ -10,6 +10,7 @@ to a Svelte UI at `http://localhost:7777`. The browser is a display surface only
 flow from browser back to the daemon.
 
 The repo has two sub-projects:
+
 - `nb/` — Python daemon, CLI, and execution framework. Managed by `uv` (see `pyproject.toml`).
 - `nb-ui/` — Svelte 5 + Vite frontend. Managed by `pnpm`.
 
