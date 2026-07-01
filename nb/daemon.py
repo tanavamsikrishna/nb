@@ -173,7 +173,6 @@ def _state_find_cell(cells: list[CellState], cell_id: int | None) -> CellState |
     return None
 
 
-
 def _fold_state(event_type: str, data: dict, path: str) -> None:
     """Fold a state-bearing event into the render state of the notebook it belongs
     to (`path`, the notebook being run). No-op for transient events (run_end and
@@ -196,7 +195,15 @@ def _fold_state(event_type: str, data: dict, path: str) -> None:
             for item in manifest:
                 cell = _state_find_cell(cells, item["id"])
                 if cell is None:
-                    cell = CellState(id=item["id"], title=item.get("title"), source_line=None, status="pending", stale=False, profiling=None, records=[])
+                    cell = CellState(
+                        id=item["id"],
+                        title=item.get("title"),
+                        source_line=None,
+                        status="pending",
+                        stale=False,
+                        profiling=None,
+                        records=[],
+                    )
                     cells.append(cell)
                 cell.title = item.get("title", cell.title)
                 cell.stale = True
@@ -211,7 +218,15 @@ def _fold_state(event_type: str, data: dict, path: str) -> None:
             for item in manifest:
                 cell = existing.get(item["id"])
                 if cell is None:
-                    cell = CellState(id=item["id"], title=item.get("title"), source_line=None, status="pending", stale=False, profiling=None, records=[])
+                    cell = CellState(
+                        id=item["id"],
+                        title=item.get("title"),
+                        source_line=None,
+                        status="pending",
+                        stale=False,
+                        profiling=None,
+                        records=[],
+                    )
                 else:
                     cell.title = item.get("title", cell.title)
                     cell.stale = True
@@ -222,7 +237,15 @@ def _fold_state(event_type: str, data: dict, path: str) -> None:
     elif event_type == "cell_start":
         cell = _state_find_cell(cells, data["cell_id"])
         if cell is None:
-            cell = CellState(id=data["cell_id"], title=data.get("title"), source_line=None, status="pending", stale=False, profiling=None, records=[])
+            cell = CellState(
+                id=data["cell_id"],
+                title=data.get("title"),
+                source_line=None,
+                status="pending",
+                stale=False,
+                profiling=None,
+                records=[],
+            )
             cells.append(cell)
             cells.sort(key=lambda c: c.id)
         cell.status = "running"
@@ -492,7 +515,9 @@ def _spill(session: NotebookSession, tag: str, n: int, suffix: str, data: bytes)
     return str(fpath)
 
 
-def _render_record(record: CellRecord, session: NotebookSession, tag: str, n: int) -> RenderedRecord:
+def _render_record(
+    record: CellRecord, session: NotebookSession, tag: str, n: int
+) -> RenderedRecord:
     """Map one display record to a query-reply entry.
 
     - table: always returns `schema` (column -> dtype) and a CSV `preview` of the
@@ -844,7 +869,7 @@ async def main(project_dir: Path, *, host: str = "0.0.0.0", port: int = 7777) ->
 
     print(f"Daemon started. Unix socket at {socket_path}, HTTP at {site_url}", flush=True)
 
-    _task = asyncio.create_task(open_site_in_browser(site_url))
+    # _task = asyncio.create_task(open_site_in_browser(site_url))
 
     # First SIGINT/SIGTERM shuts down gracefully; a second one forces exit.
     shutdown_event = asyncio.Event()
