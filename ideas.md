@@ -1,1 +1,2 @@
 - Can purity linter be extended to flag free variable modifications?
+- [ ] The spec section's expanded/collapsed state should be controlled by a single global variable (shared across notebooks and across live & experiment view). Collapsed by default.
