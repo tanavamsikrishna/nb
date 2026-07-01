@@ -6,6 +6,8 @@ import type {
   CellManifestItem,
   CellStartEvent,
   NotebookHeaderEvent,
+  ParamsEvent,
+  ArtifactsEvent,
   RunStartEvent,
 } from "./types";
 
@@ -32,6 +34,8 @@ export function connectStream(path: string) {
   notebook.header = null;
   notebook.source = null;
   notebook.cells = [];
+  notebook.params = {};
+  notebook.artifacts = [];
 
   view.connection = "connecting";
   // The path identifies which notebook's stream to subscribe to; the daemon
@@ -114,6 +118,16 @@ export function connectStream(path: string) {
         cell.records.length = cursor;
       }
     }
+  });
+
+  eventSource.addEventListener("params", (e) => {
+    const data: ParamsEvent = JSON.parse(e.data);
+    notebook.params = data.params;
+  });
+
+  eventSource.addEventListener("artifacts", (e) => {
+    const data: ArtifactsEvent = JSON.parse(e.data);
+    notebook.artifacts = data.artifacts;
   });
 
   eventSource.addEventListener("run_end", () => {

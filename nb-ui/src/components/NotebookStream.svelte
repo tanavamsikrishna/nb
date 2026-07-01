@@ -73,6 +73,8 @@
     cells={notebook.cells}
     docstring={notebook.header}
     code={notebook.source}
+    params={notebook.params}
+    artifacts={notebook.artifacts}
   >
     {#snippet emptyState()}
       <div class="empty-state">

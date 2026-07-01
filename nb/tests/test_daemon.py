@@ -174,6 +174,43 @@ def test_notebook_state_folds_full_then_partial_run() -> None:
     assert cells[1].records == [CellRecord(type="object", payload=99)]
 
 
+@pytest.mark.asyncio
+async def test_artifact_handler_serves_only_within_experiments_store(tmp_path: Path) -> None:
+    """The artifact route serves files inside the project's experiments store and
+    rejects anything outside it (no arbitrary-file reads via a crafted ?file=)."""
+    from aiohttp.test_utils import make_mocked_request
+
+    store = tmp_path / ".nb" / "experiments" / "slug" / "run1" / "artifacts"
+    store.mkdir(parents=True)
+    artifact = store / "model.pt"
+    artifact.write_bytes(b"weights")
+
+    secret = tmp_path / "secret.txt"  # outside the experiments store
+    secret.write_text("nope")
+
+    old_project = daemon._project_dir
+    daemon._project_dir = tmp_path
+    try:
+        # Missing ?file= → 400.
+        resp = await daemon.artifact_handler(make_mocked_request("GET", "/artifact"))
+        assert resp.status == 400
+
+        # A path outside the store → 404, even though the file exists.
+        import urllib.parse
+
+        q = urllib.parse.quote(str(secret), safe="")
+        resp = await daemon.artifact_handler(make_mocked_request("GET", f"/artifact?file={q}"))
+        assert resp.status == 404
+
+        # A real file inside the store → served (FileResponse points at it).
+        q = urllib.parse.quote(str(artifact), safe="")
+        resp = await daemon.artifact_handler(make_mocked_request("GET", f"/artifact?file={q}"))
+        assert isinstance(resp, daemon.web.FileResponse)
+        assert Path(resp._path).resolve() == artifact.resolve()  # type: ignore[attr-defined]
+    finally:
+        daemon._project_dir = old_project
+
+
 def test_snapshot_reproduces_state_without_transient_events() -> None:
     """The regenerated snapshot rebuilds the active session's state. Transient
     events are never folded into stored state (covered by the folding test), but

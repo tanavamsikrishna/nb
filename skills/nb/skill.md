@@ -71,17 +71,36 @@ and run the notebook once (`uv run nb run <notebook.py>`) before querying.
 
 Every `nb run` is persisted as an experiment under `.nb/experiments/` at the
 project root (survives daemon restarts). Each run saves its source code, the
-display records it produced, and any hyperparameters declared with `record_params(...)`:
+display records it produced, its hyperparameters, and any output files it logged.
+Parameters are auto-detected: any top-level global whose name is SCREAMING_SNAKE_CASE
+is collected and shown at the top of the notebook (strings verbatim, everything else
+`repr`'d):
 
 ```python
-record_params(learning_rate=0.01, epochs=10, model="resnet")   # shown in the UI *and* logged
+LEARNING_RATE = 0.01   # auto-detected params: shown in the UI *and* logged
+EPOCHS = 10
+MODEL = "resnet"
 ```
+
+**Artifacts** are output files (a model checkpoint, a saved plot, a CSV) recorded
+against the run. `artifact_path(suffix)` creates a fresh empty file inside the
+run's own directory and returns its path; `log_artifact(name, path)` records it:
+
+```python
+p = artifact_path(".pt")      # -> .nb/experiments/<slug>/<run_id>/artifacts/<...>.pt
+torch.save(model, p)
+log_artifact("model", p)      # records {name: "model", path: p} against the run
+```
+
+Unlike params, artifacts are an ordered *list* — logging the same name twice
+(e.g. a `checkpoint` per epoch) keeps every entry. Both functions are injected
+into the notebook namespace (no import needed).
 
 A full-notebook run is a *parent* experiment; a partial re-run
 (`nb run file.py:LINE`) is saved as a *child* of the most recent full run. Browse
 history from the index page's per-notebook **Experiments** link (parents
 newest-first, children nested); click a run to view its saved code, params, and
-outputs. See `skills/nb/guide.py` for the `record_params(...)` example.
+outputs. See `skills/nb/guide.py` for the parameters and artifacts examples.
 
 ## Cache Management
 

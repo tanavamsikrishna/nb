@@ -145,6 +145,14 @@ class NotebookSession:
     docstring: str | None = None
     code: str | None = None
     cells: list[CellState] = field(default_factory=list)
+    # Auto-detected experiment parameters (SCREAMING_SNAKE_CASE globals) from the
+    # most recent run, shown at the top of the notebook. Folded from the `params`
+    # event and replayed in snapshots; persisted with each saved run.
+    params: dict = field(default_factory=dict)
+    # Output files logged during the most recent run via log_artifact, an ordered
+    # list of {name, path}. Folded from the `artifacts` event and replayed in
+    # snapshots; persisted with each saved run.
+    artifacts: list = field(default_factory=list)
     # run_id of this notebook's most recent *full* run. A partial re-run is saved
     # as a child experiment of it (None until the first full run; a fresh daemon
     # with no session falls back to a full run, so a child never lacks a parent).
@@ -163,6 +171,8 @@ def _fresh_exec_ns() -> dict:
         "__builtins__": __builtins__,
         "display": fw.display,
         "nb_cache": fw.nb_cache,
+        "artifact_path": fw.artifact_path,
+        "log_artifact": fw.log_artifact,
     }
 
 
@@ -187,6 +197,10 @@ def _fold_state(event_type: str, data: dict, path: str) -> None:
         session.docstring = data.get("docstring")
         if "code" in data:
             session.code = data.get("code")
+    elif event_type == "params":
+        session.params = data.get("params", {})
+    elif event_type == "artifacts":
+        session.artifacts = data.get("artifacts", [])
     elif event_type == "run_start":
         manifest = data.get("cell_manifest", [])
         if data.get("partial"):
@@ -321,6 +335,11 @@ def _snapshot_events(session: NotebookSession | None) -> list[dict]:
                 },
             }
         )
+    # Auto-detected params, replayed before run_end the same way a live run emits
+    # them (see runner.emit_params), so a freshly-connected client shows them.
+    events.append({"event": "params", "data": {"params": session.params}})
+    # Logged artifacts, replayed the same way (see runner.emit_artifacts).
+    events.append({"event": "artifacts", "data": {"artifacts": session.artifacts}})
     # Terminal event of a completed run: clears the client's live "running"
     # indicator (set by each cell_start above) and finalizes. The snapshot
     # represents a finished run, so it must settle the client to idle the same
@@ -446,6 +465,28 @@ async def experiment_handler(request: web.Request) -> web.Response:
     if run is None:
         return web.json_response({"error": "not found"}, status=404)
     return web.json_response(run)
+
+
+async def artifact_handler(request: web.Request) -> web.FileResponse | web.Response:
+    """Serve one artifact file for download. `file` is the absolute path recorded
+    in a run's meta (see fw.log_artifact / experiments.finalize_run). It is served
+    only after confirming it resolves to a real file *inside this project's
+    experiments store*, so a crafted `?file=` can't read arbitrary files off disk.
+    The browser names the download via the link's `download` attribute; the
+    Content-Disposition here is the fallback filename when opened directly."""
+    file = request.query.get("file")
+    if not file:
+        return web.json_response({"error": "missing file"}, status=400)
+    store_root = Path(_project_dir).joinpath(*experiments.EXPERIMENTS_SUBDIR).resolve()
+    try:
+        target = Path(file).resolve()
+    except (OSError, RuntimeError, ValueError):
+        return web.json_response({"error": "bad path"}, status=400)
+    if not target.is_relative_to(store_root) or not target.is_file():
+        return web.json_response({"error": "not found"}, status=404)
+    return web.FileResponse(
+        target, headers={"Content-Disposition": f'attachment; filename="{target.name}"'}
+    )
 
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -746,6 +787,18 @@ async def handle_ipc_client(reader: asyncio.StreamReader, writer: asyncio.Stream
                         _sessions[ns_key] = session
                     session.exec_ns = _fresh_exec_ns()
 
+                # Create the run's experiment directory *before* it executes so
+                # artifacts (fw.artifact_path) land straight in it; meta/code/records
+                # are written by finalize_run after the run. Saving must never break
+                # a run, so a failure here just disables persistence for this run.
+                run_handle: experiments.RunHandle | None = None
+                try:
+                    run_handle = experiments.begin_run(_project_dir, ns_key)
+                except Exception as exc:
+                    cli_log("stderr", f"[nb] failed to start experiment: {exc}\n")
+                fw._current_run_dir = run_handle.artifacts_dir if run_handle else None
+                fw._artifacts = []
+
                 # Execute notebook in separate thread so exec doesn't block the main event loop
                 started_at = datetime.now(timezone.utc).isoformat()
                 t0 = time.perf_counter()
@@ -760,13 +813,15 @@ async def handle_ipc_client(reader: asyncio.StreamReader, writer: asyncio.Stream
                 )
                 dur_ms = int((time.perf_counter() - t0) * 1000)
 
-                # Persist the run as an experiment. By the time the executor future
-                # resolves, session.cells is fully folded (run_end was scheduled via
-                # call_soon_threadsafe before the executor returned, and the loop
-                # drains those FIFO before resuming here). A full run becomes a
-                # parent; a partial run is saved as a child of the last full run.
-                # run_code is "" only on a file-read failure — nothing worth saving.
-                if run_code:
+                # Persist the run as an experiment, filling in the directory
+                # begin_run created above. By the time the executor future resolves,
+                # session.cells/params/artifacts are fully folded (run_end was
+                # scheduled via call_soon_threadsafe before the executor returned,
+                # and the loop drains those FIFO before resuming here). A full run
+                # becomes a parent; a partial run is saved as a child of the last
+                # full run. run_code is "" only on a file-read failure — nothing
+                # worth saving, so the empty run directory is discarded.
+                if run_handle is not None and run_code:
                     is_partial = target_lines is not None
                     # A partial run leaves the parent's other cells in session.cells;
                     # save only the cells this run actually executed (spec: a child
@@ -774,11 +829,12 @@ async def handle_ipc_client(reader: asyncio.StreamReader, writer: asyncio.Stream
                     ran_ids = set(ran_cell_ids)
                     saved_cells = [c for c in session.cells if c.id in ran_ids]
                     try:
-                        saved_id = experiments.save_run(
-                            _project_dir,
-                            ns_key,
+                        saved_id = experiments.finalize_run(
+                            run_handle,
                             run_code,
                             saved_cells,
+                            params=session.params,
+                            artifacts=session.artifacts,
                             parent_run_id=session.parent_run_id if is_partial else None,
                             kind="partial" if is_partial else "full",
                             started_at=started_at,
@@ -791,6 +847,9 @@ async def handle_ipc_client(reader: asyncio.StreamReader, writer: asyncio.Stream
                     except Exception as exc:
                         # Saving an experiment must never break the run itself.
                         cli_log("stderr", f"[nb] failed to save experiment: {exc}\n")
+                elif run_handle is not None:
+                    # Nothing to save (file-read failure): remove the empty dir.
+                    experiments.discard_run(run_handle)
 
                 # Reply reflects the run outcome so `nb run` exits non-zero on a
                 # cell error (the full traceback already streamed via cli_log).
@@ -805,6 +864,7 @@ async def handle_ipc_client(reader: asyncio.StreamReader, writer: asyncio.Stream
                 await writer.drain()
             finally:
                 fw._active_emitter = old_emitter
+                fw._current_run_dir = None
 
         except Exception as e:
             resp = {"status": "error", "message": str(e)}
@@ -855,6 +915,7 @@ async def main(project_dir: Path, *, host: str = "0.0.0.0", port: int = 7777) ->
     app.router.add_get("/notebooks", notebooks_handler)
     app.router.add_get("/experiments", experiments_handler)
     app.router.add_get("/experiment", experiment_handler)
+    app.router.add_get("/artifact", artifact_handler)
     app.router.add_get("/", index_handler)
     app.router.add_static("/", STATIC_DIR)
 

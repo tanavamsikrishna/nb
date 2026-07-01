@@ -23,6 +23,7 @@ export default defineConfig({
       "/notebooks": "http://localhost:7777",
       "/experiments": "http://localhost:7777",
       "/experiment": "http://localhost:7777",
+      "/artifact": "http://localhost:7777",
     },
   },
 });

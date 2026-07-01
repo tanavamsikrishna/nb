@@ -7,7 +7,11 @@
 -->
 <script lang="ts">
   import { onMount } from "svelte";
-  import type { ExperimentRun, ExperimentsResponse } from "../lib/types";
+  import type {
+    ExperimentRun,
+    ExperimentsResponse,
+    ParamsMap,
+  } from "../lib/types";
   import AppShell from "./AppShell.svelte";
 
   let { path }: { path: string } = $props();
@@ -34,12 +38,10 @@
     return `${(ms / 1000).toFixed(ms < 10000 ? 2 : 1)} s`;
   }
 
-  function paramSummary(params: Record<string, unknown>): string {
+  function paramSummary(params: ParamsMap): string {
     const entries = Object.entries(params);
     if (entries.length === 0) return "";
-    return entries
-      .map(([k, v]) => `${k}=${typeof v === "object" ? JSON.stringify(v) : v}`)
-      .join("  ·  ");
+    return entries.map(([k, v]) => `${k}=${v}`).join("  ·  ");
   }
 
   async function load() {

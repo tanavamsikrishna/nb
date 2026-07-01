@@ -11,7 +11,7 @@ from datetime import date
 import plotly.express as px
 import polars as pl
 
-from nb import display, nb_cache, record_params
+from nb import artifact_path, display, log_artifact, nb_cache
 
 DATA_MULTIPLIER = 2
 
@@ -94,14 +94,31 @@ display(fig)
 
 # %% Experiment parameters
 
-# `record_params(**kwargs)` records experiment hyperparameters. Like display() it shows
-# the values in the UI (as a key/value table), but it logs them as a distinct
-# "params" record so every run's parameters are tracked separately from ordinary
-# output. Every `nb run` is persisted as an experiment under `.nb/experiments/`
-# at the project root (a full run is a parent; a partial `nb run file.py:LINE`
-# re-run is saved as a child of it). Browse them from the index page's
-# "Experiments" link.
-record_params(learning_rate=0.01, epochs=10, model="resnet")
+# Experiment hyperparameters are auto-detected: any top-level notebook global whose
+# name is SCREAMING_SNAKE_CASE (all-caps letters/digits, underscores allowed after
+# the first character) and whose value is a JSON-serializable scalar/container is
+# collected as a parameter. They are shown at the top of the notebook (not per-cell)
+# and logged with every run. Every `nb run` is persisted as an experiment under
+# `.nb/experiments/` at the project root (a full run is a parent; a partial
+# `nb run file.py:LINE` re-run is saved as a child of it). Browse them from the
+# index page's "Experiments" link.
+LEARNING_RATE = 0.01
+EPOCHS = 10
+MODEL = "resnet"
+
+# %% Artifacts
+
+# Output files (a model checkpoint, a saved plot, a CSV) are recorded against the
+# run. `artifact_path(suffix)` creates a fresh empty file *inside this run's own
+# experiment directory* and returns its path; write to it with any library, then
+# `log_artifact(name, path)` records it. Both are injected into the notebook
+# namespace, so the import above is optional. Unlike params, artifacts are an
+# ordered list, so logging the same name twice (e.g. a checkpoint per epoch)
+# keeps every entry.
+report_path = artifact_path(".txt")
+with open(report_path, "w") as f:
+    f.write("accuracy: 0.97\n")
+log_artifact("report", report_path)
 
 # %% Caveats
 

@@ -15,8 +15,7 @@ export type RecordType =
   | "object"
   | "table"
   | "plotly"
-  | "altair"
-  | "params";
+  | "altair";
 
 /** Base64-encoded Parquet payload for a `table` record (see `_serialize_table`). */
 export interface TablePayload {
@@ -41,9 +40,7 @@ export type DisplayRecord =
   | { type: "table"; payload: TablePayload }
   | { type: "plotly"; payload: PlotlyPayload }
   | { type: "altair"; payload: unknown }
-  | { type: "object"; payload: unknown }
-  /** Experiment hyperparameters from `params(...)`; payload is a flat kv map. */
-  | { type: "params"; payload: Record<string, unknown> };
+  | { type: "object"; payload: unknown };
 
 /** Lifecycle state of a cell. `ok`/`error` are the terminal run outcomes. */
 export type CellStatus = "pending" | "running" | "ok" | "error";
@@ -110,7 +107,8 @@ export interface ExperimentRun {
   status: "ok" | "error";
   error: string | null;
   cell_ids: number[];
-  params: Record<string, unknown>;
+  params: ParamsMap;
+  artifacts: Artifact[];
   children: ExperimentRun[];
 }
 
@@ -161,4 +159,35 @@ export interface CellEndEvent {
   cpu_ms: number;
   status: CellStatus;
   error?: string;
+}
+
+/**
+ * A flat map of auto-detected experiment parameters. Values are rendered to
+ * strings by the backend (strings as-is, everything else via repr), so a consumer
+ * only ever interpolates the value directly.
+ */
+export type ParamsMap = Record<string, string>;
+
+/**
+ * Auto-detected experiment parameters (SCREAMING_SNAKE_CASE notebook globals),
+ * emitted once at the end of a run. Shown at the top of the notebook.
+ */
+export interface ParamsEvent {
+  params: ParamsMap;
+}
+
+/**
+ * One output file logged during a run via `log_artifact` (see nb/framework.py).
+ * `path` is the absolute path on the daemon host; the UI downloads it through
+ * `/artifact?file=<path>` (the daemon validates it lives inside the experiments
+ * store). Unlike params this is an ordered list, so repeated names are all kept.
+ */
+export interface Artifact {
+  name: string;
+  path: string;
+}
+
+/** Logged artifacts, emitted once at run end (before run_end), like `params`. */
+export interface ArtifactsEvent {
+  artifacts: Artifact[];
 }

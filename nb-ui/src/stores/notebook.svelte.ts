@@ -1,6 +1,8 @@
 import type {
+  Artifact,
   Cell,
   ConnectionStatus,
+  ParamsMap,
   RunningCell,
   RunError,
 } from "../lib/types";
@@ -22,6 +24,10 @@ export interface NotebookState {
   header: string | null;
   source: string | null;
   cells: Cell[];
+  /** Auto-detected experiment parameters, shown at the top of the notebook. */
+  params: ParamsMap;
+  /** Output files logged during the run, shown as download links. */
+  artifacts: Artifact[];
 }
 
 export const notebook = $state<NotebookState>({
@@ -29,6 +35,8 @@ export const notebook = $state<NotebookState>({
   header: null,
   source: null,
   cells: [],
+  params: {},
+  artifacts: [],
 });
 
 // Transient, client-only view state — deliberately NOT part of the notebook

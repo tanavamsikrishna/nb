@@ -26,9 +26,10 @@ import hashlib
 import json
 import os
 import re
+import shutil
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 import msgspec
 
@@ -67,35 +68,22 @@ def _mint_run_id() -> str:
     return f"{ts}-{os.urandom(2).hex()}"
 
 
-def _collect_params(cells: list[Any]) -> dict:
-    """Merge every ``record_params(...)`` record across the run's cells into one dict."""
-    out: dict = {}
-    for cell in cells:
-        for rec in cell.records:
-            if rec.type == "params" and isinstance(rec.payload, dict):
-                out.update(rec.payload)
-    return out
+class RunHandle(NamedTuple):
+    """A run directory created by `begin_run`, before the run executes. `run_dir`
+    is `<slug>/<run_id>/`; `artifacts_dir` is its `artifacts/` subdir, into which
+    the notebook writes output files (see `fw.artifact_path`)."""
+
+    run_id: str
+    run_dir: Path
+    artifacts_dir: Path
 
 
-def save_run(
-    root: Any,
-    notebook_path: Any,
-    code: str,
-    cells: list[Any],
-    *,
-    parent_run_id: str | None,
-    kind: str,
-    started_at: str,
-    dur_ms: int,
-    status: str,
-    error: str | None,
-) -> str:
-    """Persist one run; returns the minted run_id.
-
-    `cells` is the daemon's `session.cells` render state. `kind` is
-    "full" | "partial"; a partial run carries `parent_run_id` of the full run it
-    descends from.
-    """
+def begin_run(root: Any, notebook_path: Any) -> RunHandle:
+    """Create a run's on-disk directory *before* it executes, so artifacts can be
+    written straight into it. Mints the run_id, creates `<run_id>/` and
+    `<run_id>/artifacts/`, and writes `notebook.json` on first use. The run's
+    meta/code/records are filled in later by `finalize_run`; a run that produces
+    nothing worth saving is removed with `discard_run`."""
     nb_dir = _notebook_dir(root, notebook_path)
     nb_dir.mkdir(parents=True, exist_ok=True)
 
@@ -108,10 +96,35 @@ def save_run(
 
     run_id = _mint_run_id()
     run_dir = nb_dir / run_id
-    run_dir.mkdir()
+    artifacts_dir = run_dir / "artifacts"
+    artifacts_dir.mkdir(parents=True)
+    return RunHandle(run_id=run_id, run_dir=run_dir, artifacts_dir=artifacts_dir)
 
+
+def finalize_run(
+    handle: RunHandle,
+    code: str,
+    cells: list[Any],
+    *,
+    params: dict,
+    artifacts: list[dict],
+    parent_run_id: str | None,
+    kind: str,
+    started_at: str,
+    dur_ms: int,
+    status: str,
+    error: str | None,
+) -> str:
+    """Write meta/code/records into a directory created by `begin_run`; returns
+    the run_id.
+
+    `cells` is the daemon's `session.cells` render state. `kind` is
+    "full" | "partial"; a partial run carries `parent_run_id` of the full run it
+    descends from. `artifacts` is an ordered list of `{name, path}` entries logged
+    during the run (see `fw.log_artifact`).
+    """
     meta = {
-        "run_id": run_id,
+        "run_id": handle.run_id,
         "parent_run_id": parent_run_id,
         "kind": kind,
         "started_at": started_at,
@@ -119,14 +132,54 @@ def save_run(
         "status": status,
         "error": error,
         "cell_ids": [c.id for c in cells],
-        "params": _collect_params(cells),
+        "params": params,
+        "artifacts": artifacts,
     }
-    (run_dir / "meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
-    (run_dir / "code.py").write_text(code, encoding="utf-8")
-    (run_dir / "records.json").write_text(
+    (handle.run_dir / "meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
+    (handle.run_dir / "code.py").write_text(code, encoding="utf-8")
+    (handle.run_dir / "records.json").write_text(
         msgspec.json.encode(cells).decode("utf-8"), encoding="utf-8"
     )
-    return run_id
+    return handle.run_id
+
+
+def discard_run(handle: RunHandle) -> None:
+    """Remove a run directory created by `begin_run` that produced nothing worth
+    saving (e.g. a file-read failure). Best-effort; never raises."""
+    shutil.rmtree(handle.run_dir, ignore_errors=True)
+
+
+def save_run(
+    root: Any,
+    notebook_path: Any,
+    code: str,
+    cells: list[Any],
+    *,
+    params: dict,
+    parent_run_id: str | None,
+    kind: str,
+    started_at: str,
+    dur_ms: int,
+    status: str,
+    error: str | None,
+    artifacts: list[dict] | None = None,
+) -> str:
+    """One-shot `begin_run` + `finalize_run` for callers that already know the run
+    outcome (no artifacts written during the run). Returns the minted run_id."""
+    handle = begin_run(root, notebook_path)
+    return finalize_run(
+        handle,
+        code,
+        cells,
+        params=params,
+        artifacts=artifacts or [],
+        parent_run_id=parent_run_id,
+        kind=kind,
+        started_at=started_at,
+        dur_ms=dur_ms,
+        status=status,
+        error=error,
+    )
 
 
 def list_notebooks(root: Any) -> list[NotebookInfo]:

@@ -1,11 +1,15 @@
 import dis
 import hashlib
 import json
+import os
 import pickle
+import re
+import tempfile
 import types
 from contextlib import contextmanager
 from contextvars import ContextVar
 from functools import wraps
+from pathlib import Path
 from typing import Any, Callable, Generator, Literal, TypeVar, cast, overload
 
 import msgspec
@@ -165,15 +169,77 @@ def display(
     _sink.get()(_create_display_record(obj, as_, label=label))
 
 
-def record_params(**kwargs: Any) -> None:
-    """Record experiment hyperparameters.
+# A top-level notebook global is treated as an experiment parameter when its name
+# is SCREAMING_SNAKE_CASE (all-caps letters/digits, underscores allowed after the
+# first character). These are auto-collected after a run and shown at the top of
+# the notebook, replacing the old explicit ``record_params(...)`` call.
+_PARAM_NAME_RE = re.compile(r"[A-Z0-9][A-Z0-9_]*")
 
-    Like ``display`` it emits through the active sink, so the values are rendered
-    live (as a key/value table), captured/replayed by ``@nb_cache``, and folded
-    into the daemon's cell state — but it produces a distinct ``"params"`` record
-    so experiment tracking can collect them separately from ordinary output.
-    """
-    _sink.get()(DisplayRecord(type="params", payload=_serialize_object(kwargs)))
+
+def _param_value(value: Any) -> str:
+    """Render a param value to a display string. Strings pass through untouched (no
+    surrounding quotes); everything else goes through ``repr``. Nothing is dropped —
+    if a value's ``__repr__`` raises, param collection must neither crash the run
+    (see runner.emit_params) nor silently omit the value, so the failure is surfaced
+    as a visible placeholder instead."""
+    if isinstance(value, str):
+        return value
+    try:
+        return repr(value)
+    except Exception as exc:
+        return f"<unrepr-able {type(value).__name__}: {exc}>"
+
+
+def collect_params(ns: dict) -> dict[str, str]:
+    """Auto-detect experiment parameters from a run's namespace: every top-level
+    global whose name is SCREAMING_SNAKE_CASE, rendered to a string via _param_value.
+    Insertion order (definition order) is preserved."""
+    return {
+        name: _param_value(value)
+        for name, value in ns.items()
+        if _PARAM_NAME_RE.fullmatch(name)
+    }
+
+
+# The current run's artifacts directory, set by the daemon for the run's duration
+# (like _current_cell_id). artifact_path writes into it so output files land
+# straight in the saved experiment's directory. None outside a run (e.g. a
+# `nb query exec`), where artifact_path falls back to the system temp dir.
+_current_run_dir: Path | None = None
+
+# Output files logged during the current run, in call order. The daemon rebinds
+# this to a fresh list at the start of each run; read back via collect_artifacts,
+# emitted with the run, and persisted into the saved experiment's meta. Kept as an
+# ordered list rather than a name->path map (unlike params) so repeated names — a
+# checkpoint per epoch, a plot per fold — are all preserved, and each entry can
+# grow beyond {name, path} later without changing the shape.
+_artifacts: list[dict] = []
+
+
+def artifact_path(suffix: str = "") -> str:
+    """Create a fresh, empty file in the current run's artifacts directory and
+    return its path. ``suffix`` sets the extension (e.g. ``".png"``, ``".pt"``).
+    The file is created so a library can open it for writing, but left empty.
+    Outside a run (no active experiment directory) it lands in the system temp
+    dir instead. Pair with :func:`log_artifact` to record it against the run."""
+    directory = str(_current_run_dir) if _current_run_dir is not None else None
+    fd, path = tempfile.mkstemp(suffix=suffix, dir=directory)
+    os.close(fd)
+    return path
+
+
+def log_artifact(name: str, path: str) -> None:
+    """Record an output file against the current run under ``name``. Appends to an
+    ordered list, so logging the same ``name`` twice keeps both entries (unlike a
+    param, which a repeated name would overwrite). ``path`` is typically one
+    returned by :func:`artifact_path`, but any path works."""
+    _artifacts.append({"name": name, "path": str(path)})
+
+
+def collect_artifacts() -> list[dict]:
+    """Return the artifacts logged during the current run (a copy), in call order.
+    The imperative counterpart to :func:`collect_params`."""
+    return list(_artifacts)
 
 
 def _code_fingerprint(code: types.CodeType) -> bytes:

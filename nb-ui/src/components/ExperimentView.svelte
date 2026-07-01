@@ -75,30 +75,12 @@
       <span class="run-id">{experimentDetail.meta.run_id}</span>
     </div>
 
-    {#if Object.keys(experimentDetail.meta.params).length > 0}
-      <section class="block">
-        <h3>Parameters</h3>
-        <table class="params-table">
-          <tbody>
-            {#each Object.entries(experimentDetail.meta.params) as [key, value]}
-              <tr>
-                <th>{key}</th>
-                <td
-                  >{typeof value === "object" && value !== null
-                    ? JSON.stringify(value)
-                    : String(value)}</td
-                >
-              </tr>
-            {/each}
-          </tbody>
-        </table>
-      </section>
-    {/if}
-
     <NotebookView
       cells={experimentDetail.cells}
       docstring={experimentDetail.docstring}
       code={experimentDetail.code}
+      params={experimentDetail.meta.params}
+      artifacts={experimentDetail.meta.artifacts ?? []}
     />
   {:else if loaded}
     <div class="empty-state">
@@ -143,49 +125,5 @@
     color: var(--fg-tertiary);
     font-family: var(--font-mono);
     font-size: 0.75rem;
-  }
-
-  .block {
-    margin-bottom: 32px;
-  }
-
-  .block h3 {
-    font-family: var(--font-sans);
-    font-size: 0.8rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--fg-secondary);
-    margin: 0 0 12px;
-  }
-
-  .params-table {
-    border-collapse: collapse;
-    font-family: var(--font-mono);
-    font-size: 0.85rem;
-    border: 1px solid var(--border-default);
-    border-radius: var(--radius-md);
-    overflow: hidden;
-  }
-
-  .params-table th {
-    text-align: left;
-    font-weight: 600;
-    color: var(--fg-secondary);
-    background: var(--bg-header);
-    padding: 6px 12px;
-    border-bottom: 1px solid var(--border-subtle);
-    border-right: 1px solid var(--border-subtle);
-    white-space: nowrap;
-  }
-
-  .params-table td {
-    padding: 6px 12px;
-    color: var(--fg-primary);
-    border-bottom: 1px solid var(--border-subtle);
-  }
-
-  .params-table tr:last-child th,
-  .params-table tr:last-child td {
-    border-bottom: none;
   }
 </style>

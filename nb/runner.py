@@ -261,8 +261,24 @@ def run_notebook(
     exec_ns.setdefault("__name__", "__main__")
     exec_ns.setdefault("__builtins__", __builtins__)
     exec_ns.setdefault("display", fw.display)
-    exec_ns.setdefault("record_params", fw.record_params)
     exec_ns.setdefault("nb_cache", fw.nb_cache)
+    exec_ns.setdefault("artifact_path", fw.artifact_path)
+    exec_ns.setdefault("log_artifact", fw.log_artifact)
+
+    def emit_params() -> None:
+        # Experiment parameters are auto-detected from the run's namespace as
+        # SCREAMING_SNAKE_CASE globals (see fw.collect_params) rather than declared
+        # explicitly. Emitted once at the end of the run (before run_end) so the
+        # values reflect everything the cells assigned; the daemon folds them into
+        # session state and the UI shows them at the top of the notebook.
+        emit_event("params", {"params": fw.collect_params(exec_ns)})
+
+    def emit_artifacts() -> None:
+        # Output files logged during the run via log_artifact (see
+        # fw.collect_artifacts). Emitted once at the end of the run (before
+        # run_end), like params, so the daemon folds them into session state and
+        # persists them into the saved experiment's meta.
+        emit_event("artifacts", {"artifacts": fw.collect_artifacts()})
 
     old_emitter = fw._active_emitter
     installed_runner_emitter = old_emitter is None
@@ -349,10 +365,14 @@ def run_notebook(
                     },
                 )
 
+                emit_params()
+                emit_artifacts()
                 emit_event("run_end", {"status": "error"})
                 errored = True
                 return errored, run_code, ran_cell_ids
 
+        emit_params()
+        emit_artifacts()
         emit_event("run_end", {"status": "ok"})
         return errored, run_code, ran_cell_ids
     finally:
