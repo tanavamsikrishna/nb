@@ -26,7 +26,6 @@
     emptyState?: Snippet;
   } = $props();
 
-  let visibleCells = $derived(cells.filter((c) => c.records.length > 0));
   let highlightedCode = $derived(
     code ? hljs.highlight(code, { language: "python" }).value : null,
   );
@@ -40,7 +39,7 @@
   {@render emptyState?.()}
 {:else}
   <div class="cells-list">
-    {#each visibleCells as cell (cell.id)}
+    {#each cells as cell (cell.id)}
       <Cell_ {cell} />
     {/each}
   </div>
@@ -52,7 +51,8 @@
   <section class="source-block">
     <details>
       <summary>Source code</summary>
-      <pre class="code-block"><code class="hljs">{@html highlightedCode}</code></pre>
+      <pre class="code-block"><code class="hljs">{@html highlightedCode}</code
+        ></pre>
     </details>
   </section>
 {/if}

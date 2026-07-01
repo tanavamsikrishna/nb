@@ -22,116 +22,44 @@
   import Markdown from "./Markdown.svelte";
   import JSONTree from "./JSONTree.svelte";
   import DataTable from "./DataTable.svelte";
-  import { loadPlotly, loadVega } from "../lib/lazy_load";
-  import type { Cell, PlotlyPayload } from "../lib/types";
+  import PlotlyOutput from "./PlotlyOutput.svelte";
+  import AltairOutput from "./AltairOutput.svelte";
+  import type { Cell } from "../lib/types";
 
   // Svelte 5 props
   let { cell }: { cell: Cell } = $props();
 
-  // Svelte actions for third party rendering. Outputs are no longer remounted
-  // on re-run (records are updated in place), so each action must re-render
-  // when its payload changes via the `update` callback rather than only on
-  // mount.
-  function plotlyAction(node: HTMLElement, payload: PlotlyPayload) {
-    let active = true;
-    function render(p: PlotlyPayload) {
-      loadPlotly()
-        .then((Plotly) => {
-          if (active) {
-            // Default to a usable height; without one Plotly falls back to the
-            // container's height  and collapses. The figure's own layout.height still wins if it sets one.
-            const layout = { autosize: true, height: 450, ...p.layout };
-            const config = { responsive: true, ...(p.config || {}) };
-            // Plotly.react diffs against the current figure and updates in
-            // place (no flash); it also handles the initial render.
-            Plotly.react(node, p.data, layout, config);
-          }
-        })
-        .catch((err) => {
-          if (active) {
-            node.innerHTML = `<span class="error-msg">Failed to render Plotly: ${err.message || err}</span>`;
-          }
-        });
-    }
-    render(payload);
-    return {
-      update(p: PlotlyPayload) {
-        render(p);
-      },
-      destroy() {
-        active = false;
-        loadPlotly()
-          .then((Plotly) => Plotly.purge(node))
-          .catch(() => {});
-      },
-    };
-  }
-
-  function altairAction(node: HTMLElement, payload: unknown) {
-    let active = true;
-    let view: any = null;
-    function render(spec: unknown) {
-      loadVega()
-        .then((vegaEmbed) => {
-          if (!active) return;
-          if (view) {
-            view.finalize?.();
-            node.innerHTML = "";
-          }
-          vegaEmbed(node, spec, { actions: false })
-            .then((res) => {
-              if (active) view = res;
-              else res.finalize?.();
-            })
-            .catch((err) => {
-              node.innerHTML = `<span class="error-msg">Failed to render Altair: ${err.message || err}</span>`;
-            });
-        })
-        .catch((err) => {
-          if (active) {
-            node.innerHTML = `<span class="error-msg">Failed to render Altair: ${err.message || err}</span>`;
-          }
-        });
-    }
-    render(payload);
-    return {
-      update(spec: unknown) {
-        render(spec);
-      },
-      destroy() {
-        active = false;
-        view?.finalize?.();
-      },
-    };
-  }
+  // Each output type has its own renderer component (Markdown, DataTable,
+  // PlotlyOutput, AltairOutput, JSONTree). The plotly/altair components own the
+  // $state.snapshot boundary that detaches proxied payloads before their
+  // mutating libraries touch them (see PlotlyOutput.svelte).
 </script>
 
-<div
-  class="cell-container {cell.status} {cell.stale ? 'stale' : ''} {cell.absent
-    ? 'absent'
-    : ''}"
->
-  <!-- Cell Header / Status Bar -->
+<!-- A cell with no output renders nothing at all — no header, no container.
+     (Output-less and not-yet-emitted cells are simply absent from the view.) -->
+{#if cell.records.length > 0}
   <div
-    class="cell-header"
-    class:no-output={cell.records.length === 0 && cell.status === "ok"}
+    class="cell-container {cell.status} {cell.stale ? 'stale' : ''} {cell.absent
+      ? 'absent'
+      : ''}"
   >
-    <div class="left-header">
-      {#if cell.status === "running"}
-        <div class="run-dot" aria-hidden="true"></div>
-      {/if}
-      <span class="cell-num">Cell {cell.id + 1}</span>
-      {#if cell.title}
-        <span class="cell-title">{cell.title}</span>
-      {/if}
-      {#if cell.stale}
-        <span class="stale-badge">Stale</span>
-      {/if}
+    <!-- Cell Header / Status Bar -->
+    <div class="cell-header">
+      <div class="left-header">
+        {#if cell.status === "running"}
+          <div class="run-dot" aria-hidden="true"></div>
+        {/if}
+        <span class="cell-num">Cell {cell.id + 1}</span>
+        {#if cell.title}
+          <span class="cell-title">{cell.title}</span>
+        {/if}
+        {#if cell.stale}
+          <span class="stale-badge">Stale</span>
+        {/if}
+      </div>
     </div>
-  </div>
 
-  <!-- Cell Outputs -->
-  {#if cell.records.length != 0}
+    <!-- Cell Outputs -->
     <div class="cell-outputs">
       {#each cell.records as record}
         <div class="output-item">
@@ -144,9 +72,9 @@
               {@html record.payload}
             </div>
           {:else if record.type === "plotly"}
-            <div class="plotly-output" use:plotlyAction={record.payload}></div>
+            <PlotlyOutput payload={record.payload} />
           {:else if record.type === "altair"}
-            <div class="altair-output" use:altairAction={record.payload}></div>
+            <AltairOutput payload={record.payload} />
           {:else if record.type === "object"}
             <div class="object-output">
               <JSONTree val={record.payload} />
@@ -170,16 +98,10 @@
             <pre class="text-output">{record.payload}</pre>
           {/if}
         </div>
-      {:else}
-        {#if cell.status === "pending"}
-          <div class="placeholder-msg">Waiting for execution...</div>
-        {:else if cell.status === "running" && cell.records.length === 0}
-          <div class="placeholder-msg pulsing">Running cell...</div>
-        {/if}
       {/each}
     </div>
-  {/if}
-</div>
+  </div>
+{/if}
 
 <style>
   .cell-container {
@@ -217,10 +139,6 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-  }
-
-  .cell-header.no-output {
-    border-bottom: none;
   }
 
   .left-header {
@@ -278,17 +196,6 @@
     width: 100%;
   }
 
-  .placeholder-msg {
-    font-size: 0.85rem;
-    color: var(--fg-secondary);
-    font-style: italic;
-  }
-
-  .placeholder-msg.pulsing {
-    color: var(--color-primary);
-    animation: textPulse 1.5s infinite alternate;
-  }
-
   /* Plain text rendering — unstyled, flows like markdown */
   .text-output {
     margin: 0;
@@ -331,16 +238,6 @@
     background: var(--bg-sunken);
   }
 
-  .plotly-output,
-  .altair-output {
-    background: var(--bg-elevated);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-md);
-    padding: 12px;
-    min-height: 100px;
-    overflow: hidden;
-  }
-
   .object-output {
     background: var(--bg-sunken);
     border: 1px solid var(--border-subtle);
@@ -381,12 +278,6 @@
     border-bottom: none;
   }
 
-  .error-msg {
-    color: var(--color-error);
-    font-size: 0.85rem;
-    font-weight: 500;
-  }
-
   @keyframes nb-pulse {
     0%,
     100% {
@@ -394,15 +285,6 @@
     }
     50% {
       opacity: 0.3;
-    }
-  }
-
-  @keyframes textPulse {
-    0% {
-      opacity: 0.5;
-    }
-    100% {
-      opacity: 0.9;
     }
   }
 </style>

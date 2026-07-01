@@ -7,15 +7,7 @@
 -->
 <script lang="ts">
   import { onMount } from "svelte";
-  import {
-    cells,
-    notebookHeader,
-    notebookPath,
-    notebookSource,
-    connectionStatus,
-    runningCell,
-    runError,
-  } from "../stores/cells";
+  import { notebook, view } from "../stores/notebook.svelte";
   import { connectStream } from "../lib/stream";
   import { tooltip } from "../lib/tooltip";
   import AppShell from "./AppShell.svelte";
@@ -24,7 +16,6 @@
   let { path }: { path: string } = $props();
 
   onMount(() => {
-    notebookPath.set(path);
     connectStream(path);
   });
 </script>
@@ -34,19 +25,19 @@
     <a class="logo-nb logo-home" href="/" title="All notebooks">nb</a>
     <span class="logo-separator">/</span>
     <span class="logo-sub">notebook stream</span>
-    {#if $notebookPath}
-      <span class="notebook-path" use:tooltip={$notebookPath}>
-        <span class="notebook-path-text">{"‎" + $notebookPath}</span>
+    {#if notebook.path}
+      <span class="notebook-path" use:tooltip={notebook.path}>
+        <span class="notebook-path-text">{"‎" + notebook.path}</span>
       </span>
     {/if}
   {/snippet}
 
   {#snippet aside()}
-    <div class="conn-status {$connectionStatus}">
+    <div class="conn-status {view.connection}">
       <div class="conn-dot"></div>
-      {#if $connectionStatus === "connected"}
+      {#if view.connection === "connected"}
         connected to daemon
-      {:else if $connectionStatus === "connecting"}
+      {:else if view.connection === "connecting"}
         connecting...
       {:else}
         disconnected
@@ -55,23 +46,23 @@
   {/snippet}
 
   {#snippet bar()}
-    {#if $runError}
+    {#if view.error}
       <div class="exec-bar error">
         <div class="exec-content">
-          <span class="exec-num">Cell {$runError.id + 1}</span>
-          {#if $runError.title}
-            <span class="exec-title">{$runError.title}</span>
+          <span class="exec-num">Cell {view.error.id + 1}</span>
+          {#if view.error.title}
+            <span class="exec-title">{view.error.title}</span>
           {/if}
-          <span class="error-message">{$runError.message}</span>
+          <span class="error-message">{view.error.message}</span>
         </div>
       </div>
-    {:else if $runningCell}
+    {:else if view.running}
       <div class="exec-bar">
         <div class="exec-content">
           <div class="run-dot" aria-hidden="true"></div>
-          <span class="exec-num">Cell {$runningCell.id + 1}</span>
-          {#if $runningCell.title}
-            <span class="exec-title">{$runningCell.title}</span>
+          <span class="exec-num">Cell {view.running.id + 1}</span>
+          {#if view.running.title}
+            <span class="exec-title">{view.running.title}</span>
           {/if}
         </div>
       </div>
@@ -79,9 +70,9 @@
   {/snippet}
 
   <NotebookView
-    cells={$cells}
-    docstring={$notebookHeader}
-    code={$notebookSource}
+    cells={notebook.cells}
+    docstring={notebook.header}
+    code={notebook.source}
   >
     {#snippet emptyState()}
       <div class="empty-state">
