@@ -261,7 +261,7 @@ def run_notebook(
     exec_ns.setdefault("__name__", "__main__")
     exec_ns.setdefault("__builtins__", __builtins__)
     exec_ns.setdefault("display", fw.display)
-    exec_ns.setdefault("params", fw.params)
+    exec_ns.setdefault("record_params", fw.record_params)
     exec_ns.setdefault("nb_cache", fw.nb_cache)
 
     old_emitter = fw._active_emitter

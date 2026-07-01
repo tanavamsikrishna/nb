@@ -68,7 +68,7 @@ def _mint_run_id() -> str:
 
 
 def _collect_params(cells: list[Any]) -> dict:
-    """Merge every ``params(...)`` record across the run's cells into one dict."""
+    """Merge every ``record_params(...)`` record across the run's cells into one dict."""
     out: dict = {}
     for cell in cells:
         for rec in cell.records:

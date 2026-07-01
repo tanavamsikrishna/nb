@@ -11,7 +11,7 @@ from datetime import date
 import plotly.express as px
 import polars as pl
 
-from nb import display, nb_cache, params
+from nb import display, nb_cache, record_params
 
 DATA_MULTIPLIER = 2
 
@@ -94,14 +94,14 @@ display(fig)
 
 # %% Experiment parameters
 
-# `params(**kwargs)` records experiment hyperparameters. Like display() it shows
+# `record_params(**kwargs)` records experiment hyperparameters. Like display() it shows
 # the values in the UI (as a key/value table), but it logs them as a distinct
 # "params" record so every run's parameters are tracked separately from ordinary
 # output. Every `nb run` is persisted as an experiment under `.nb/experiments/`
 # at the project root (a full run is a parent; a partial `nb run file.py:LINE`
 # re-run is saved as a child of it). Browse them from the index page's
 # "Experiments" link.
-params(learning_rate=0.01, epochs=10, model="resnet")
+record_params(learning_rate=0.01, epochs=10, model="resnet")
 
 # %% Caveats
 

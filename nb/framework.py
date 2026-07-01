@@ -165,7 +165,7 @@ def display(
     _sink.get()(_create_display_record(obj, as_, label=label))
 
 
-def params(**kwargs: Any) -> None:
+def record_params(**kwargs: Any) -> None:
     """Record experiment hyperparameters.
 
     Like ``display`` it emits through the active sink, so the values are rendered

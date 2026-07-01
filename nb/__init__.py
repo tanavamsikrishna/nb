@@ -2,12 +2,12 @@ from nb.framework import (
     _cache,
     display,
     nb_cache,
-    params,
+    record_params,
 )
 
 __all__ = [
     "nb_cache",
     "display",
-    "params",
+    "record_params",
     "_cache",
 ]

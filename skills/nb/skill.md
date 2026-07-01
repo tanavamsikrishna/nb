@@ -71,17 +71,17 @@ and run the notebook once (`uv run nb run <notebook.py>`) before querying.
 
 Every `nb run` is persisted as an experiment under `.nb/experiments/` at the
 project root (survives daemon restarts). Each run saves its source code, the
-display records it produced, and any hyperparameters declared with `params(...)`:
+display records it produced, and any hyperparameters declared with `record_params(...)`:
 
 ```python
-params(learning_rate=0.01, epochs=10, model="resnet")   # shown in the UI *and* logged
+record_params(learning_rate=0.01, epochs=10, model="resnet")   # shown in the UI *and* logged
 ```
 
 A full-notebook run is a *parent* experiment; a partial re-run
 (`nb run file.py:LINE`) is saved as a *child* of the most recent full run. Browse
 history from the index page's per-notebook **Experiments** link (parents
 newest-first, children nested); click a run to view its saved code, params, and
-outputs. See `skills/nb/guide.py` for the `params(...)` example.
+outputs. See `skills/nb/guide.py` for the `record_params(...)` example.
 
 ## Cache Management
 

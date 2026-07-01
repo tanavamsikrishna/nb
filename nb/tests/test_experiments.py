@@ -149,12 +149,12 @@ def test_list_missing_notebook_is_empty(tmp_path: Path) -> None:
 
 
 def test_params_emits_params_record() -> None:
-    # params(...) flows through the active sink as a distinct "params" record.
+    # record_params(...) flows through the active sink as a distinct "params" record.
     captured: list[fw.DisplayRecord] = []
     old = fw._active_emitter
     fw._active_emitter = captured.append
     try:
-        fw.params(lr=0.01, epochs=10)
+        fw.record_params(lr=0.01, epochs=10)
     finally:
         fw._active_emitter = old
     assert len(captured) == 1
