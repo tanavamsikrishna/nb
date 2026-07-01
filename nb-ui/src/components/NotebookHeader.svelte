@@ -5,11 +5,11 @@
   cell list. Markdown rendering is delegated to the Markdown component.
 
   Collapse behaviour (per-session, shared across all notebooks and both the
-  live and experiment views via the `ui` store):
-    - Collapsed (default): a quiet full-width strip showing a chevron + the
-      docstring's first heading. Click anywhere on it to expand.
-    - Expanded: the hero card. Clicking its first line (the title) collapses
-      it again; a hover cue (pointer + ▾) hints at this without adding chrome.
+  live and experiment views via the `ui` store): the title row (chevron +
+  hero title) is always rendered identically — it never moves or restyles.
+  Toggling only shows/hides the body below it. Collapsed by default so cells
+  stay front-and-centre. The title heading is hoisted into the row and
+  stripped from the body so it isn't shown twice.
 
   Props:
     docstring  string  — raw Markdown content (default: "")
@@ -27,96 +27,46 @@
   // Svelte 5 props
   let { docstring = "" }: { docstring?: string } = $props();
 
-  // Summary shown on the collapsed strip: the docstring's first Markdown
-  // heading, else its first non-empty line, else a generic label — rendered
-  // as inline Markdown (parseInline drops the block <p> wrapper so it stays a
-  // single ellipsised line) to keep `code`/emphasis styled.
-  const titleHtml = $derived(marked.parseInline(firstLine(docstring)) as string);
+  // Split the docstring into its title (first non-empty line, minus any
+  // leading `#`) and the remaining body. The title is always shown in the
+  // toggle row and stripped from the body so it never renders twice.
+  const spec = $derived(parseSpec(docstring));
 
-  function firstLine(md: string): string {
-    for (const raw of md.split("\n")) {
-      const line = raw.trim();
+  // Title rendered as inline Markdown (parseInline drops the block <p> wrapper)
+  // so `code`/emphasis in the heading stay styled.
+  const titleHtml = $derived(marked.parseInline(spec.title) as string);
+
+  function parseSpec(md: string): { title: string; body: string } {
+    const lines = md.split("\n");
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
       if (!line) continue;
       const heading = line.match(/^#{1,6}\s+(.*?)\s*#*$/);
-      return heading ? heading[1] : line;
+      const title = heading ? heading[1] : line;
+      const body = [...lines.slice(0, i), ...lines.slice(i + 1)].join("\n");
+      return { title, body };
     }
-    return "Spec";
+    return { title: "Spec", body: "" };
   }
 
-  // Collapse only when the click lands on the card's first rendered block
-  // (the title) — never on body text, so selecting/copying stays safe.
-  function onCardClick(e: MouseEvent) {
-    const first = e.currentTarget instanceof HTMLElement
-      ? e.currentTarget.querySelector(".markdown")?.firstElementChild
-      : null;
-    if (first && e.target instanceof Node && first.contains(e.target)) {
-      ui.specCollapsed = true;
-    }
-  }
+  const toggle = () => (ui.specCollapsed = !ui.specCollapsed);
 </script>
 
-{#if ui.specCollapsed}
+<div class="notebook-header" class:collapsed={ui.specCollapsed}>
   <button
-    class="spec-strip"
-    aria-expanded="false"
-    onclick={() => (ui.specCollapsed = false)}
+    class="spec-header"
+    aria-expanded={!ui.specCollapsed}
+    onclick={toggle}
   >
-    <span class="chev">▸</span>
-    <span class="spec-title">{@html titleHtml}</span>
+    <span class="chev" class:open={!ui.specCollapsed}>▸</span>
+    <h1 class="spec-title">{@html titleHtml}</h1>
   </button>
-{:else}
-  <div class="notebook-header" onclick={onCardClick} role="presentation">
-    <Markdown source={docstring} variant="hero" />
-  </div>
-{/if}
+  {#if !ui.specCollapsed && spec.body.trim()}
+    <Markdown source={spec.body} variant="hero" />
+  {/if}
+</div>
 
 <style>
-  /* ── Collapsed: quiet breadcrumb-like strip ─────────────────────── */
-  .spec-strip {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    width: 100%;
-    margin: 0 0 12px;
-    padding: 5px 6px;
-    background: none;
-    border: none;
-    border-radius: var(--radius-sm);
-    color: var(--fg-secondary);
-    font-family: var(--font-sans);
-    font-size: 0.9rem;
-    text-align: left;
-    cursor: pointer;
-    transition: background 0.12s, color 0.12s;
-  }
-
-  .spec-strip:hover {
-    background: var(--bg-sunken);
-    color: var(--fg-primary);
-  }
-
-  .chev {
-    flex: none;
-    font-size: 0.75rem;
-    color: var(--fg-muted);
-  }
-
-  .spec-title {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .spec-title :global(code) {
-    font-family: var(--font-mono);
-    font-size: 0.85em;
-    padding: 1px 3px;
-    border-radius: var(--radius-sm);
-    background: var(--bg-muted);
-    color: var(--color-accent);
-  }
-
-  /* ── Expanded: the hero card (unchanged) ────────────────────────── */
   .notebook-header {
     background: var(--bg-elevated);
     border: 1px solid var(--border-default);
@@ -127,24 +77,52 @@
     box-shadow: var(--shadow-lg);
   }
 
-  /* Title (first rendered block) is the collapse affordance: invisible at
-     rest, revealed on hover so it stays crisp and out of the way. */
-  .notebook-header :global(.markdown--hero > :first-child) {
+  /* Toggle row: chevron + hero title. Identical in both states. */
+  .spec-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    width: 100%;
+    padding: 0;
+    background: none;
+    border: none;
+    text-align: left;
     cursor: pointer;
-    width: fit-content;
   }
 
-  .notebook-header :global(.markdown--hero > :first-child)::after {
-    content: " ▾";
-    font-size: 0.6em;
-    vertical-align: middle;
-    opacity: 0;
+  .chev {
+    flex: none;
+    font-size: 1.1rem;
     color: var(--fg-muted);
-    -webkit-text-fill-color: var(--fg-muted);
-    transition: opacity 0.12s;
+    transition: transform 0.15s ease, color 0.12s;
   }
 
-  .notebook-header :global(.markdown--hero > :first-child:hover)::after {
-    opacity: 1;
+  .chev.open {
+    transform: rotate(90deg);
+  }
+
+  .spec-header:hover .chev {
+    color: var(--fg-secondary);
+  }
+
+  .spec-title {
+    margin: 0;
+    font-family: var(--font-sans);
+    font-size: 2.25rem;
+    font-weight: 800;
+    letter-spacing: -0.025em;
+    background: linear-gradient(
+      135deg,
+      var(--color-primary) 0%,
+      var(--color-secondary) 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .spec-title :global(code) {
+    font-family: var(--font-mono);
+    font-size: 0.85em;
   }
 </style>

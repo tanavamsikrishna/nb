@@ -51,7 +51,34 @@
     const ext = dot > slash ? a.path.slice(dot) : "";
     return a.name + ext;
   }
+
+  // Which artifact path was just copied, for transient "Copied" feedback.
+  let copiedPath = $state<string | null>(null);
+  let copiedTimer: ReturnType<typeof setTimeout> | undefined;
+
+  async function copyPath(path: string): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(path);
+    } catch {
+      // Fallback for non-secure contexts where the async clipboard API is blocked.
+      const ta = document.createElement("textarea");
+      ta.value = path;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+    }
+    copiedPath = path;
+    clearTimeout(copiedTimer);
+    copiedTimer = setTimeout(() => (copiedPath = null), 1500);
+  }
 </script>
+
+{#if docstring}
+  <NotebookHeader {docstring} />
+{/if}
 
 {#if paramEntries.length > 0}
   <section class="params-block">
@@ -97,14 +124,50 @@
             <span class="artifact-name">{artifact.name}</span>
             <span class="artifact-file">{downloadName(artifact)}</span>
           </a>
+          <button
+            type="button"
+            class="artifact-copy"
+            title={artifact.path}
+            aria-label="Copy full path"
+            onclick={() => copyPath(artifact.path)}
+          >
+            {#if copiedPath === artifact.path}
+              <svg
+                class="artifact-icon"
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M20 6L9 17l-5-5" />
+              </svg>
+              <span>Copied</span>
+            {:else}
+              <svg
+                class="artifact-icon"
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <rect x="9" y="9" width="11" height="11" rx="2" />
+                <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+              </svg>
+              <span>Copy path</span>
+            {/if}
+          </button>
         </li>
       {/each}
     </ul>
   </section>
-{/if}
-
-{#if docstring}
-  <NotebookHeader {docstring} />
 {/if}
 
 {#if cells.length === 0}
@@ -196,6 +259,12 @@
     gap: 6px;
   }
 
+  .artifacts-list li {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
   .artifact-link {
     display: inline-flex;
     align-items: center;
@@ -238,6 +307,35 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .artifact-copy {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    background: var(--bg-muted);
+    color: var(--fg-secondary);
+    font-family: var(--font-sans);
+    font-size: 0.75rem;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition:
+      border-color 0.12s ease,
+      background 0.12s ease,
+      color 0.12s ease;
+  }
+
+  .artifact-copy:hover {
+    border-color: var(--color-primary);
+    background: var(--bg-sunken);
+    color: var(--fg-primary);
+  }
+
+  .artifact-copy .artifact-icon {
+    color: currentColor;
   }
 
   .cells-list {
