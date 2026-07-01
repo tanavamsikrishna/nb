@@ -1,8 +1,11 @@
 import asyncio
 import base64
 import contextlib
+import importlib.abc
+import importlib.util
 import io
 import json
+import linecache
 import os
 import re
 import signal
@@ -15,8 +18,9 @@ import traceback
 import webbrowser
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from importlib.machinery import ModuleSpec, PathFinder, SourceFileLoader
 from pathlib import Path
-from typing import Any, Set
+from typing import Any, Set, TypeGuard
 
 import msgspec
 from aiohttp import web
@@ -104,6 +108,91 @@ def _build_package_prefixes() -> frozenset[str]:
 # Installed-package and stdlib path prefixes — modules whose __file__ starts
 # with one of these are left alone by --clear-imports.
 _package_prefixes: frozenset[str] = _build_package_prefixes()
+
+
+def _iter_user_modules():
+    """Yield (name, file) for each currently-imported local/user module — the same
+    set --clear-imports targets: a `.py` __file__, not present at daemon startup,
+    and not living under an installed-package/stdlib prefix."""
+    for k, m in list(sys.modules.items()):
+        if k in _baseline_modules:
+            continue
+        f = getattr(m, "__file__", None)
+        if f is not None and f.endswith(".py") and not any(
+            f.startswith(p) for p in _package_prefixes
+        ):
+            yield k, f
+
+
+def _is_frozen_entry(entry) -> TypeGuard[tuple[int, None, list[str], str]]:
+    """True if `entry` is one of our permanent linecache pins: a 4-tuple with a None
+    mtime slot (a lazy-cache entry is a 1-tuple; a normal disk-cached entry has a
+    float mtime). linecache.checkcache skips such entries, so they survive on-disk
+    edits — that's what keeps the shown source aligned with the bytecode that ran."""
+    return entry is not None and len(entry) == 4 and entry[1] is None
+
+
+def _freeze_linecache(filename: str, text: str) -> None:
+    """Pin `text` as the linecache source for `filename` with mtime=None (permanent —
+    checkcache skips it), so tracebacks render this exact source even after the file
+    changes on disk. Mirrors the notebook-source freeze in runner.py."""
+    linecache.cache[filename] = (len(text), None, text.splitlines(keepends=True), filename)
+
+
+class _PinningLoader(SourceFileLoader):
+    """SourceFileLoader that pins a module's source into linecache the instant it is
+    loaded — reading the .py itself, so it captures the source even when the bytecode
+    comes from a cached .pyc (no compile happens then). Freezing at import time, before
+    any later on-disk edit, is what lets a traceback show the code that actually ran —
+    even for a module edited *while the notebook is still running*."""
+
+    def get_code(self, fullname):
+        try:
+            text = importlib.util.decode_source(self.get_data(self.path))  # PEP 263 cookie
+            _freeze_linecache(self.path, text)
+        except Exception:
+            pass  # pinning must never break the import that triggered it
+        return super().get_code(fullname)
+
+
+class _PinningFinder(importlib.abc.MetaPathFinder):
+    """Meta-path finder that swaps in _PinningLoader for local (user) source modules,
+    leaving stdlib/site-packages on their stock loader (they don't get pinned, matching
+    --clear-imports scope and avoiding pinning every library's source)."""
+
+    def find_spec(self, fullname, path, target=None) -> ModuleSpec | None:
+        spec = PathFinder.find_spec(fullname, path, target)
+        origin = spec.origin if spec else None
+        if (
+            spec is not None
+            and origin is not None
+            and origin.endswith(".py")
+            and not any(origin.startswith(p) for p in _package_prefixes)
+        ):
+            spec.loader = _PinningLoader(fullname, origin)
+        return spec
+
+
+def _stale_user_modules() -> list[tuple[str, str]]:
+    """(name, file) for imported user modules whose on-disk source has diverged from
+    the pinned source that actually ran (see _PinningLoader). These keep
+    executing the old bytecode until --clear-imports, so the caller warns about them
+    before a run. Modules with no frozen entry (never ran, or lazily cached) have no
+    baseline to compare against and are skipped."""
+    stale: list[tuple[str, str]] = []
+    for name, f in _iter_user_modules():
+        entry = linecache.cache.get(f)
+        if not _is_frozen_entry(entry):
+            continue  # not frozen — no known "what ran" baseline
+        frozen = "".join(entry[2])  # splitlines(keepends=True) round-trips exactly
+        try:
+            with open(f, "r", encoding="utf-8") as fh:
+                current = fh.read()
+        except OSError:
+            continue
+        if current != frozen:
+            stale.append((name, f))
+    return stale
 
 
 @dataclass(eq=False)  # identity hash: each connection is a distinct object
@@ -748,16 +837,12 @@ async def handle_ipc_client(reader: asyncio.StreamReader, writer: asyncio.Stream
                     await writer.drain()
 
                 if clear_imports:
-                    to_remove = [
-                        k
-                        for k, m in list(sys.modules.items())
-                        if k not in _baseline_modules
-                        and (f := getattr(m, "__file__", None)) is not None
-                        and f.endswith(".py")
-                        and not any(f.startswith(p) for p in _package_prefixes)
-                    ]
-                    for k in to_remove:
+                    to_remove = list(_iter_user_modules())
+                    for k, f in to_remove:
                         sys.modules.pop(k, None)
+                        # Drop the pinned source so the re-import re-pins fresh
+                        # (see _PinningLoader).
+                        linecache.cache.pop(f, None)
                     writer.write(
                         json.dumps(
                             {"status": "imports", "imports": {"count": len(to_remove)}}
@@ -765,6 +850,19 @@ async def handle_ipc_client(reader: asyncio.StreamReader, writer: asyncio.Stream
                         + b"\n"
                     )
                     await writer.drain()
+
+                # Warn (don't reload) about modules edited on disk since they were
+                # imported: the daemon keeps running the old bytecode, so the coming
+                # run — and any traceback from it — reflects the stale version. After
+                # a --clear-imports the affected modules were dropped above, so this
+                # correctly reports nothing until they're re-imported and re-run.
+                for name, _f in _stale_user_modules():
+                    cli_log(
+                        "stderr",
+                        f"[nb] warning: '{name}' changed on disk since it was imported; "
+                        "still running the previously imported version "
+                        "(re-run with --clear-imports to reload it).\n",
+                    )
 
                 # Resolve the session and run mode. Events route by `ns_key`
                 # (passed to emit_event), so folding lands in this notebook's
@@ -904,6 +1002,10 @@ async def open_site_in_browser(site_url: str) -> None:
 async def main(project_dir: Path, *, host: str = "0.0.0.0", port: int = 7777) -> None:
     global _project_dir
     _project_dir = project_dir
+    # Pin module sources at import time so tracebacks show the code that ran even if
+    # the file is edited while the notebook is still running (see _PinningLoader).
+    # Inserted at the front of meta_path to wrap the loader before a module is loaded.
+    sys.meta_path.insert(0, _PinningFinder())
     socket_path = project_dir / ".nb.sock"
     if socket_path.exists():
         socket_path.unlink()

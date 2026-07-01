@@ -1,7 +1,10 @@
 import asyncio
+import importlib
 import json
+import linecache
 import shutil
 import socket
+import sys
 import tempfile
 from pathlib import Path
 
@@ -575,3 +578,101 @@ async def test_notebooks_listing_and_path_scoped_stream(tmp_path: Path) -> None:
         except asyncio.CancelledError:
             pass
         shutil.rmtree(project_dir, ignore_errors=True)
+
+
+def test_pinning_loader_survives_disk_edit(tmp_path: Path) -> None:
+    # The loader pins source at load time, so a file edited afterward (without a
+    # re-import) still resolves to the code that actually ran, not the disk contents.
+    mod_file = tmp_path / "pin_loader_mod.py"
+    mod_file.write_text("def boom():\n    raise ValueError('original')\n")
+    f = str(mod_file)
+    try:
+        daemon._PinningLoader("pin_loader_mod", f).get_code("pin_loader_mod")
+        assert daemon._is_frozen_entry(linecache.cache.get(f))
+
+        # Edit on disk with shifted line numbers (as a mid-run edit would).
+        mod_file.write_text("# added\n# added 2\ndef boom():\n    raise ValueError('EDITED')\n")
+        linecache.checkcache(f)
+        assert "original" in linecache.getline(f, 2)  # pinned line, not the edited disk line
+        assert "EDITED" not in linecache.getline(f, 2)
+    finally:
+        linecache.cache.pop(f, None)
+
+
+def test_pin_finder_wraps_only_user_modules(tmp_path: Path) -> None:
+    mod_file = tmp_path / "pin_finder_user_mod.py"
+    mod_file.write_text("X = 1\n")
+    sys.path.insert(0, str(tmp_path))
+    finder = daemon._PinningFinder()
+    try:
+        # A local module (not under a package prefix) gets the pinning loader.
+        user_spec = finder.find_spec("pin_finder_user_mod", None)
+        assert user_spec is not None
+        assert isinstance(user_spec.loader, daemon._PinningLoader)
+
+        # A stdlib module lives under a package prefix and keeps its stock loader.
+        std_spec = finder.find_spec("textwrap", None)
+        assert std_spec is not None
+        assert not isinstance(std_spec.loader, daemon._PinningLoader)
+    finally:
+        if str(tmp_path) in sys.path:
+            sys.path.remove(str(tmp_path))
+
+
+def test_source_pin_survives_pyc_load(tmp_path: Path) -> None:
+    # The gap the audit hook couldn't close: a module re-loaded from a fresh .pyc runs
+    # no compile, yet the loader reads the .py itself, so it still pins the source.
+    mod_name = "nb_pin_pyc_mod"
+    mod_file = tmp_path / f"{mod_name}.py"
+    mod_file.write_text("def boom():\n    raise ValueError('RAN')\n")
+    f = str(mod_file)
+    sys.path.insert(0, str(tmp_path))
+    finder = daemon._PinningFinder()
+    sys.meta_path.insert(0, finder)
+    try:
+        importlib.import_module(mod_name)  # compiles, writes .pyc, pins
+        # Simulate --clear-imports WITHOUT editing: the fresh .pyc is reused on reimport.
+        sys.modules.pop(mod_name, None)
+        linecache.cache.pop(f, None)
+        importlib.import_module(mod_name)  # loads .pyc (no compile), loader still pins
+        assert daemon._is_frozen_entry(linecache.cache.get(f))
+    finally:
+        sys.meta_path.remove(finder)
+        importlib.invalidate_caches()
+        sys.modules.pop(mod_name, None)
+        linecache.cache.pop(f, None)
+        if str(tmp_path) in sys.path:
+            sys.path.remove(str(tmp_path))
+
+
+def test_stale_user_modules_detects_disk_drift(tmp_path: Path) -> None:
+    mod_name = "nb_drift_helper_mod"
+    mod_file = tmp_path / f"{mod_name}.py"
+    mod_file.write_text("VALUE = 1\n")
+    f = str(mod_file)
+    sys.path.insert(0, str(tmp_path))
+    finder = daemon._PinningFinder()
+    sys.meta_path.insert(0, finder)
+    try:
+        importlib.import_module(mod_name)  # pins at import
+        assert (mod_name, f) in list(daemon._iter_user_modules())
+
+        # Unedited: disk matches the pinned source, so no drift is reported.
+        assert all(name != mod_name for name, _ in daemon._stale_user_modules())
+
+        # Edit on disk without re-importing: the pinned source now diverges.
+        mod_file.write_text("VALUE = 2\n")
+        assert (mod_name, f) in daemon._stale_user_modules()
+
+        # Simulate --clear-imports (drop module + pinned entry); with no baseline
+        # there is nothing to compare against, so no stale warning is produced.
+        sys.modules.pop(mod_name, None)
+        linecache.cache.pop(f, None)
+        assert all(name != mod_name for name, _ in daemon._stale_user_modules())
+    finally:
+        sys.meta_path.remove(finder)
+        importlib.invalidate_caches()
+        sys.modules.pop(mod_name, None)
+        linecache.cache.pop(f, None)
+        if str(tmp_path) in sys.path:
+            sys.path.remove(str(tmp_path))
