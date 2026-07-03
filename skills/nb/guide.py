@@ -118,7 +118,7 @@ MODEL = "resnet"
 # keeps every entry.
 report_path = artifact_path("report.txt")
 with open(report_path, "w") as f:
-    f.write("accuracy: 0.97\n")
+    _ = f.write("accuracy: 0.97\n")
 log_artifact(report_path)
 
 # %% Caveats
