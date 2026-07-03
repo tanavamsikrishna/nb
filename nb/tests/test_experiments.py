@@ -1,4 +1,5 @@
 import json
+import shutil
 from pathlib import Path
 
 import msgspec
@@ -244,39 +245,43 @@ def test_save_run_defaults_artifacts_to_empty_list(tmp_path: Path) -> None:
 
 
 def test_artifact_path_writes_into_current_run_dir(tmp_path: Path) -> None:
-    # artifact_path creates an empty file inside fw._current_run_dir with the given
-    # suffix; log_artifact appends {name, path} in call order (dups kept).
+    # artifact_path creates an empty file with the requested name inside
+    # fw._current_run_dir, deduping repeats with a counter; log_artifact appends
+    # {name, path} in call order (dups kept), name defaulting to the basename.
     artifacts_dir = tmp_path / "artifacts"
     artifacts_dir.mkdir()
     old_dir, old_list = fw._current_run_dir, fw._artifacts
     fw._current_run_dir = artifacts_dir
     fw._artifacts = []
     try:
-        p1 = fw.artifact_path(".pt")
-        p2 = fw.artifact_path(".png")
-        assert Path(p1).parent == artifacts_dir
-        assert Path(p1).is_file() and Path(p1).suffix == ".pt"
-        assert Path(p2).suffix == ".png"
+        p1 = fw.artifact_path("model.pt")
+        p2 = fw.artifact_path("model.pt")  # same name again — deduped on disk
+        assert Path(p1) == artifacts_dir / "model.pt"
+        assert Path(p2) == artifacts_dir / "model-1.pt"
+        assert Path(p1).is_file() and Path(p2).is_file()
 
-        fw.log_artifact("model", p1)
-        fw.log_artifact("model", p2)  # same name twice — both kept
+        fw.log_artifact(p1, name="model")
+        fw.log_artifact(p2, name="model")  # same label twice — both kept
+        fw.log_artifact(p2)  # label defaults to the basename
         assert fw.collect_artifacts() == [
             {"name": "model", "path": p1},
             {"name": "model", "path": p2},
+            {"name": "model-1.pt", "path": p2},
         ]
     finally:
         fw._current_run_dir, fw._artifacts = old_dir, old_list
 
 
 def test_artifact_path_falls_back_to_temp_dir_outside_run() -> None:
-    # With no active run, artifact_path still creates a usable file (system temp).
+    # With no active run, artifact_path creates the file in a fresh temp dir,
+    # keeping the requested file name.
     old_dir = fw._current_run_dir
     fw._current_run_dir = None
     p = ""
     try:
-        p = fw.artifact_path(".txt")
-        assert Path(p).is_file() and Path(p).suffix == ".txt"
+        p = fw.artifact_path("report.txt")
+        assert Path(p).is_file() and Path(p).name == "report.txt"
     finally:
         if p:
-            Path(p).unlink(missing_ok=True)
+            shutil.rmtree(Path(p).parent, ignore_errors=True)
         fw._current_run_dir = old_dir

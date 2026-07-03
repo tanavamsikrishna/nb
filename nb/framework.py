@@ -216,24 +216,43 @@ _current_run_dir: Path | None = None
 _artifacts: list[dict] = []
 
 
-def artifact_path(suffix: str = "") -> str:
-    """Create a fresh, empty file in the current run's artifacts directory and
-    return its path. ``suffix`` sets the extension (e.g. ``".png"``, ``".pt"``).
+def artifact_path(filename: str) -> str:
+    """Create a fresh, empty file named ``filename`` (e.g. ``"report.txt"``,
+    ``"model.pt"``) in the current run's artifacts directory and return its path.
     The file is created so a library can open it for writing, but left empty.
-    Outside a run (no active experiment directory) it lands in the system temp
-    dir instead. Pair with :func:`log_artifact` to record it against the run."""
-    directory = str(_current_run_dir) if _current_run_dir is not None else None
-    fd, path = tempfile.mkstemp(suffix=suffix, dir=directory)
-    os.close(fd)
-    return path
+    Each run has its own directory, so the name is kept verbatim; asking for the
+    same name twice within a run dedupes with a counter (``model.pt``,
+    ``model-1.pt``, ...). Outside a run (no active experiment directory) the file
+    lands in a fresh system temp directory instead, still under its own name.
+    Pair with :func:`log_artifact` to record it against the run."""
+    filename = Path(filename).name
+    if not filename:
+        raise ValueError("artifact_path needs a file name, e.g. 'report.txt'")
+    if _current_run_dir is not None:
+        directory = Path(_current_run_dir)
+    else:
+        directory = Path(tempfile.mkdtemp(prefix="nb-artifacts-"))
+    stem, ext = os.path.splitext(filename)
+    target = directory / filename
+    counter = 0
+    while True:
+        try:
+            fd = os.open(target, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except FileExistsError:
+            counter += 1
+            target = directory / f"{stem}-{counter}{ext}"
+        else:
+            os.close(fd)
+            return str(target)
 
 
-def log_artifact(name: str, path: str) -> None:
-    """Record an output file against the current run under ``name``. Appends to an
-    ordered list, so logging the same ``name`` twice keeps both entries (unlike a
-    param, which a repeated name would overwrite). ``path`` is typically one
-    returned by :func:`artifact_path`, but any path works."""
-    _artifacts.append({"name": name, "path": str(path)})
+def log_artifact(path: str, name: str | None = None) -> None:
+    """Record an output file against the current run. ``name`` is the label shown
+    in the UI; it defaults to the file's basename. Appends to an ordered list, so
+    logging the same name twice keeps both entries (unlike a param, which a
+    repeated name would overwrite). ``path`` is typically one returned by
+    :func:`artifact_path`, but any path works."""
+    _artifacts.append({"name": name or Path(path).name, "path": str(path)})
 
 
 def collect_artifacts() -> list[dict]:

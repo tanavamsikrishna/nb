@@ -566,8 +566,9 @@ async def artifact_handler(request: web.Request) -> web.FileResponse | web.Respo
     in a run's meta (see fw.log_artifact / experiments.finalize_run). It is served
     only after confirming it resolves to a real file *inside this project's
     experiments store*, so a crafted `?file=` can't read arbitrary files off disk.
-    The browser names the download via the link's `download` attribute; the
-    Content-Disposition here is the fallback filename when opened directly."""
+    The Content-Disposition filename names the download (it takes precedence over
+    a link's `download` attribute); the on-disk basename is the real artifact
+    name, per fw.artifact_path."""
     file = request.query.get("file")
     if not file:
         return web.json_response({"error": "missing file"}, status=400)
