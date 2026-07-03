@@ -109,16 +109,17 @@ MODEL = "resnet"
 # %% Artifacts
 
 # Output files (a model checkpoint, a saved plot, a CSV) are recorded against the
-# run. `artifact_path(suffix)` creates a fresh empty file *inside this run's own
-# experiment directory* and returns its path; write to it with any library, then
-# `log_artifact(name, path)` records it. Both are injected into the notebook
+# run. `artifact_path(filename)` creates a fresh empty file with that name *inside
+# this run's own experiment directory* and returns its full path; write to it with
+# any library, then `log_artifact(path)` records it (the UI label defaults to the
+# file name; pass `name=` to override). Both are injected into the notebook
 # namespace, so the import above is optional. Unlike params, artifacts are an
 # ordered list, so logging the same name twice (e.g. a checkpoint per epoch)
 # keeps every entry.
-report_path = artifact_path(".txt")
+report_path = artifact_path("report.txt")
 with open(report_path, "w") as f:
     f.write("accuracy: 0.97\n")
-log_artifact("report", report_path)
+log_artifact(report_path)
 
 # %% Caveats
 

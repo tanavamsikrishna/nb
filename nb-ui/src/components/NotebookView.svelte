@@ -42,14 +42,12 @@
     return "/artifact?file=" + encodeURIComponent(a.path);
   }
 
-  // Suggested download filename: the logged name, plus the file's real extension
-  // when the name doesn't already carry one (the on-disk name is a temp string).
+  // Download filename: artifacts keep their real name on disk (fw.artifact_path),
+  // so the basename is the download name — it also matches the daemon's
+  // Content-Disposition, which is what actually names the saved file.
   function downloadName(a: Artifact): string {
-    if (a.name.includes(".")) return a.name;
-    const dot = a.path.lastIndexOf(".");
     const slash = Math.max(a.path.lastIndexOf("/"), a.path.lastIndexOf("\\"));
-    const ext = dot > slash ? a.path.slice(dot) : "";
-    return a.name + ext;
+    return a.path.slice(slash + 1);
   }
 
   // Which artifact path was just copied, for transient "Copied" feedback.
@@ -122,7 +120,9 @@
               <path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" />
             </svg>
             <span class="artifact-name">{artifact.name}</span>
-            <span class="artifact-file">{downloadName(artifact)}</span>
+            {#if downloadName(artifact) !== artifact.name}
+              <span class="artifact-file">{downloadName(artifact)}</span>
+            {/if}
           </a>
           <button
             type="button"

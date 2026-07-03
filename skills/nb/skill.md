@@ -83,13 +83,14 @@ MODEL = "resnet"
 ```
 
 **Artifacts** are output files (a model checkpoint, a saved plot, a CSV) recorded
-against the run. `artifact_path(suffix)` creates a fresh empty file inside the
-run's own directory and returns its path; `log_artifact(name, path)` records it:
+against the run. `artifact_path(filename)` creates a fresh empty file with that
+name inside the run's own directory and returns its full path;
+`log_artifact(path, name=None)` records it (name defaults to the file's basename):
 
 ```python
-p = artifact_path(".pt")      # -> .nb/experiments/<slug>/<run_id>/artifacts/<...>.pt
+p = artifact_path("model.pt")  # -> .nb/experiments/<slug>/<run_id>/artifacts/model.pt
 torch.save(model, p)
-log_artifact("model", p)      # records {name: "model", path: p} against the run
+log_artifact(p)                # records {name: "model.pt", path: p} against the run
 ```
 
 Unlike params, artifacts are an ordered *list* — logging the same name twice
