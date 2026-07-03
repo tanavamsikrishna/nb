@@ -22,6 +22,7 @@ from importlib.machinery import ModuleSpec, PathFinder, SourceFileLoader
 from pathlib import Path
 from typing import Any, Set, TypeGuard
 
+import aiohttp
 import msgspec
 from aiohttp import web
 
@@ -118,8 +119,10 @@ def _iter_user_modules():
         if k in _baseline_modules:
             continue
         f = getattr(m, "__file__", None)
-        if f is not None and f.endswith(".py") and not any(
-            f.startswith(p) for p in _package_prefixes
+        if (
+            f is not None
+            and f.endswith(".py")
+            and not any(f.startswith(p) for p in _package_prefixes)
         ):
             yield k, f
 
@@ -497,6 +500,8 @@ async def stream_handler(request: web.Request) -> web.StreamResponse:
             await response.write(_format_sse(event))
     except asyncio.CancelledError:
         pass
+    except aiohttp.ClientConnectionResetError:
+        print("Connection to frontend reset")
     finally:
         active_clients.discard(client)
     return response
