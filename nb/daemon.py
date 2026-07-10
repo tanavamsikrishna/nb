@@ -127,6 +127,28 @@ def _iter_user_modules():
             yield k, f
 
 
+def _user_modules_to_clear() -> list[tuple[str, str | None]]:
+    """(name, file) for every module --clear-imports should drop from sys.modules.
+
+    Starts from _iter_user_modules (source-having user modules) then sweeps in any
+    surviving *descendant* of a removed module. _iter_user_modules only matches a
+    `.py` __file__, so a namespace sub-package (a directory with no __init__.py,
+    whose __file__ is None) survives even when its regular-package parent is dropped.
+    Its __path__ (a _NamespacePath) still references the now-missing parent, and the
+    next import crashes recalculating it (KeyError on the parent name). Dropping the
+    dangling descendant too forces it to be rebuilt cleanly on re-import. Namespace
+    packages have no __file__, hence the `str | None` file slot."""
+    to_remove: list[tuple[str, str | None]] = list(_iter_user_modules())
+    removed = {k for k, _ in to_remove}
+    for k, m in list(sys.modules.items()):
+        if k in removed or k in _baseline_modules:
+            continue
+        if any(k.startswith(f"{p}.") for p in removed):
+            to_remove.append((k, getattr(m, "__file__", None)))
+            removed.add(k)
+    return to_remove
+
+
 def _is_frozen_entry(entry) -> TypeGuard[tuple[int, None, list[str], str]]:
     """True if `entry` is one of our permanent linecache pins: a 4-tuple with a None
     mtime slot (a lazy-cache entry is a 1-tuple; a normal disk-cached entry has a
@@ -843,12 +865,13 @@ async def handle_ipc_client(reader: asyncio.StreamReader, writer: asyncio.Stream
                     await writer.drain()
 
                 if clear_imports:
-                    to_remove = list(_iter_user_modules())
+                    to_remove = _user_modules_to_clear()
                     for k, f in to_remove:
                         sys.modules.pop(k, None)
                         # Drop the pinned source so the re-import re-pins fresh
-                        # (see _PinningLoader).
-                        linecache.cache.pop(f, None)
+                        # (see _PinningLoader). Namespace packages have no __file__.
+                        if f is not None:
+                            linecache.cache.pop(f, None)
                     writer.write(
                         json.dumps(
                             {"status": "imports", "imports": {"count": len(to_remove)}}

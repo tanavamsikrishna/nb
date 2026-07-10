@@ -645,6 +645,50 @@ def test_source_pin_survives_pyc_load(tmp_path: Path) -> None:
             sys.path.remove(str(tmp_path))
 
 
+def test_clear_imports_sweeps_dangling_namespace_subpackage(tmp_path: Path) -> None:
+    # A regular package (has __init__.py) whose sub-package is a *namespace* package
+    # (no __init__.py). _iter_user_modules only matches modules with a `.py` __file__,
+    # so a naive clear drops the regular parent but leaves the namespace child in
+    # sys.modules with a __path__ still pointing at the now-missing parent — the next
+    # import then crashes recalculating it (KeyError on the parent name).
+    pkg = tmp_path / "nb_ns_pkg"
+    (pkg).mkdir()
+    (pkg / "__init__.py").write_text("")
+    ns = pkg / "ns_child"  # namespace package: deliberately NO __init__.py
+    ns.mkdir()
+    (ns / "leaf.py").write_text("VALUE = 1\n")
+
+    sys.path.insert(0, str(tmp_path))
+    finder = daemon._PinningFinder()
+    sys.meta_path.insert(0, finder)
+    names = ["nb_ns_pkg", "nb_ns_pkg.ns_child", "nb_ns_pkg.ns_child.leaf"]
+    try:
+        importlib.import_module("nb_ns_pkg.ns_child.leaf")
+        assert all(n in sys.modules for n in names)
+
+        # The removal set must include the namespace sub-package, even though it has
+        # no __file__, so nothing is left dangling.
+        to_clear = {k for k, _ in daemon._user_modules_to_clear()}
+        assert "nb_ns_pkg.ns_child" in to_clear
+
+        # Apply the clear and confirm re-import succeeds (would raise KeyError before).
+        for k, f in daemon._user_modules_to_clear():
+            sys.modules.pop(k, None)
+            if f is not None:
+                linecache.cache.pop(f, None)
+        assert all(n not in sys.modules for n in names)
+        importlib.invalidate_caches()
+        reloaded = importlib.import_module("nb_ns_pkg.ns_child.leaf")
+        assert reloaded.VALUE == 1
+    finally:
+        sys.meta_path.remove(finder)
+        importlib.invalidate_caches()
+        for n in names:
+            sys.modules.pop(n, None)
+        if str(tmp_path) in sys.path:
+            sys.path.remove(str(tmp_path))
+
+
 def test_stale_user_modules_detects_disk_drift(tmp_path: Path) -> None:
     mod_name = "nb_drift_helper_mod"
     mod_file = tmp_path / f"{mod_name}.py"
