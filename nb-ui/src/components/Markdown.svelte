@@ -125,13 +125,7 @@
     font-family: var(--font-sans);
     font-size: 2.25rem;
     font-weight: 800;
-    background: linear-gradient(
-      135deg,
-      var(--color-primary) 0%,
-      var(--color-secondary) 100%
-    );
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+    color: var(--fg-primary);
     letter-spacing: -0.025em;
   }
 

@@ -4,71 +4,71 @@
  * components; import once in main.js. Static light palette, no runtime switching.
  * Web fonts load via the @import below.
  */
-@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Outfit:wght@100..900&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap");
 
 :root {
-  /* Typography */
-  --font-serif: "New York", Georgia, serif;
-  --font-sans: "SF Pro", -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-mono: "MonaspiceNe Nerd Font", ui-monospace, monospace;
+  /* Typography — sans UI/prose, mono for data & code */
+  --font-serif: "Inter", system-ui, -apple-system, sans-serif; /* was New York/Georgia */
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 
-  /* Backgrounds — slate */
-  --bg-base: #eef1f7;
-  --bg-elevated: #eaeef5;
-  --bg-sunken: #e0e6f2;
-  --bg-muted: #e0e6f2;
-  --bg-header: #e2e6ee;
+  /* Backgrounds — warm paper, distinct steps (not a single wash) */
+  --bg-base: #f7f6f3;
+  --bg-elevated: #ffffff;
+  --bg-sunken: #f1f0ec;
+  --bg-muted: #faf9f7;
+  --bg-header: #fbfbf9;
 
-  /* Foreground / Text — slate */
-  --fg-primary: #1c2333;
-  --fg-secondary: #6b7280;
-  --fg-tertiary: #9aa0ac;
+  /* Foreground / Text */
+  --fg-primary: #212229;
+  --fg-secondary: #6b6e77;
+  --fg-tertiary: #a2a4ad;
   --fg-on-accent: #ffffff;
 
-  /* Borders — slate */
-  --border-default: #c4cad6;
-  --border-subtle: #d4d8e4;
+  /* Borders — hairlines */
+  --border-default: #e7e6e1;
+  --border-subtle: #efeeea;
 
-  /* Primary / Accent — steel blue, derived to harmonize with slate */
-  --color-primary: #4a6fa5;
-  --color-secondary: #6889b0;
-  --color-accent: #5a7fb0;
+  /* Primary / Accent — one blurple, ported from Nocturne (readable on light) */
+  --color-primary: #6d61c2;
+  --color-secondary: #7d72cc;
+  --color-accent: #6d61c2;
 
-  /* Semantic */
+  /* Semantic — muted so they don't fight the data view */
   --color-error: #c0392b;
-  --color-success: #2e7d32;
+  --color-success: #2e9e6b;
   --color-warning: #c47a20;
-  --color-info: #4a7fb5;
-  --color-link: #4a7fb5;
-  --color-link-visited: #7a5a9e;
+  --color-info: #6d61c2;
+  --color-link: #6d61c2;
+  --color-link-visited: #8a5aa0;
 
-  /* Shadows — slate */
-  --shadow-sm: 0 1px 2px hsla(220, 20%, 50%, 12%);
-  --shadow-md: 0 4px 6px -1px hsla(220, 20%, 50%, 16%);
-  --shadow-lg: 0 10px 15px -3px hsla(220, 20%, 50%, 20%);
+  /* Shadows — soft, warm-neutral (cards read as lifted, not boxed) */
+  --shadow-sm: 0 1px 2px rgba(30, 28, 24, 0.06);
+  --shadow-md: 0 4px 12px -2px rgba(30, 28, 24, 0.10);
+  --shadow-lg: 0 12px 32px -6px rgba(30, 28, 24, 0.14);
 
-  /* Spacing / Radii */
-  --radius-sm: 4px;
+  /* Radii */
+  --radius-sm: 5px;
   --radius-md: 8px;
   --radius-lg: 12px;
   --radius-xl: 16px;
   --radius-full: 9999px;
 
   /* Semantic aliases */
-  --color-brand: var(--color-secondary);
+  --color-brand: var(--color-primary);
   --color-interactive: var(--color-primary);
   --color-surface-tint: var(--color-accent);
 
-  /* Interactive states — slate */
-  --color-interactive-hover: #3a5a8a;
-  --color-interactive-active: #2d4a70;
+  /* Interactive states */
+  --color-interactive-hover: #5a4fae;
+  --color-interactive-active: #4b4197;
   --color-focus-ring: var(--color-primary);
-  --color-focus-ring-offset: #eef1f7;
+  --color-focus-ring-offset: #f7f6f3;
 
-  /* Code surfaces — slate */
-  --fg-code: #3d4f6a;
-  --bg-code-inline: #d4d8e4;
-  --bg-code-block: #d4d8e4;
+  /* Code surfaces */
+  --fg-code: #4a4652;
+  --bg-code-inline: #f3f1fb;
+  --bg-code-block: #f1f0ec;
 
   /* Spacing scale */
   --space-1: 4px;
@@ -79,7 +79,7 @@
   --space-8: 32px;
   --space-12: 48px;
 
-  /* Selection — slate */
-  --color-selection-bg: #b8c5da;
-  --color-selection-fg: #1c2333;
+  /* Selection — light accent tint */
+  --color-selection-bg: #e3dffb;
+  --color-selection-fg: #212229;
 }
