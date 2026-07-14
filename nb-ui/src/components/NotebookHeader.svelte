@@ -71,7 +71,7 @@
     background: var(--bg-elevated);
     border: 1px solid var(--border-default);
     border-radius: var(--radius-xl);
-    padding: 28px;
+    padding: 16px 28px;
     margin-bottom: 32px;
     color: var(--fg-primary);
     box-shadow: var(--shadow-lg);
@@ -88,6 +88,11 @@
     border: none;
     text-align: left;
     cursor: pointer;
+  }
+
+  /* Body appears below the title row when expanded. */
+  .notebook-header :global(.markdown--hero) {
+    margin-top: 14px;
   }
 
   .chev {

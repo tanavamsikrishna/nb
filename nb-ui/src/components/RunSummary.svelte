@@ -72,7 +72,9 @@
     border: 1px solid var(--border-default);
     border-radius: var(--radius-md, 6px);
     padding: 16px 20px;
-    margin-top: 12px;
+    margin: 12px 0 0;
+    width: fit-content;
+    max-width: 100%;
   }
 
   .summary-title {

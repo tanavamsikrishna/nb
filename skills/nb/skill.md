@@ -29,6 +29,32 @@ Notebook description (Markdown supported).
 # code...
 ```
 
+### Cell granularity
+
+A cell should map to a **top-level section** of the notebook — a coherent unit of
+work such as "Data exploration", "Data preparation", "OOS analysis", or whatever
+sections are idiosyncratic to the notebook — not to a single output.
+
+Do **not** create a new cell for each individual `display(...)`. A section that
+produces several outputs (a summary table, a distribution plot, a couple of
+sanity-check values) belongs in **one** cell that emits all of them. Splitting
+every output into its own cell fragments the notebook, bloats the sidebar with
+dozens of tiny entries, and buries the actual structure of the analysis.
+
+```python
+# %% Data exploration
+# One section, several related outputs — all in this cell.
+df = load_data()
+display(df.describe(), label="Summary stats")
+display(px.histogram(df, x="value"))
+display(f"{df['id'].n_unique()} unique ids", as_="md")
+
+# %% Data preparation
+# The next distinct section starts a new cell.
+clean = df.drop_nulls().filter(pl.col("value") > 0)
+display(clean.head(), label="Cleaned")
+```
+
 ## Running a Notebook
 
 ```bash
