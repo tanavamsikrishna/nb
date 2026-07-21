@@ -15,3 +15,8 @@ nb-ui/dist/
 nb-ui/node_modules/
 .nb.sock
 .nb/
+
+# from former global gitignore
+.DS_Store
+Session.vim
+scratch.*
