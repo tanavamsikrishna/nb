@@ -99,7 +99,9 @@
     flex: none;
     font-size: 1.1rem;
     color: var(--fg-muted);
-    transition: transform 0.15s ease, color 0.12s;
+    transition:
+      transform 0.15s ease,
+      color 0.12s;
   }
 
   .chev.open {
