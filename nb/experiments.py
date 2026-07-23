@@ -27,6 +27,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, NamedTuple
@@ -257,4 +258,60 @@ def load_run(root: Any, notebook_path: Any, run_id: str) -> dict | None:
         "cells": (
             json.loads(records_file.read_text(encoding="utf-8")) if records_file.is_file() else []
         ),
+    }
+
+
+def _diff_side(meta: dict) -> dict:
+    """Modal header fields for one side of a code diff."""
+    return {
+        "run_id": meta["run_id"],
+        "started_at": meta["started_at"],
+        "status": meta["status"],
+        "params": meta["params"],
+    }
+
+
+def diff_run_code(root: Any, notebook_path: Any, a_id: str, b_id: str) -> dict:
+    """Side-by-side code diff of two full runs via system `difft`.
+
+    Expects existing full-run ids for ``notebook_path``. Parses stored meta/code
+    and runs difft; does not re-check call arguments.
+
+    Returns ``{a, b, identical, diff}``. ``diff`` is difftastic stdout (with ANSI).
+    """
+    a_dir = _notebook_dir(root, notebook_path) / a_id
+    b_dir = _notebook_dir(root, notebook_path) / b_id
+    a_meta = json.loads((a_dir / "meta.json").read_text(encoding="utf-8"))
+    b_meta = json.loads((b_dir / "meta.json").read_text(encoding="utf-8"))
+    a_code = a_dir / "code.py"
+    b_code = b_dir / "code.py"
+    a_side = _diff_side(a_meta)
+    b_side = _diff_side(b_meta)
+
+    if a_code.read_bytes() == b_code.read_bytes():
+        return {"a": a_side, "b": b_side, "identical": True, "diff": ""}
+
+    # --color=always: ANSI even when stdout is a pipe.
+    # --background=light: matches the light UI theme.
+    # --width: non-TTY has no terminal size. Sized for the CodeDiffModal
+    # (~min(1400px, 96vw) at 0.75rem mono ≈ 180 columns for side-by-side).
+    proc = subprocess.run(
+        [
+            "difft",
+            "--display=side-by-side",
+            "--color=always",
+            "--background=light",
+            "--width=180",
+            str(a_code),
+            str(b_code),
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return {
+        "a": a_side,
+        "b": b_side,
+        "identical": False,
+        "diff": proc.stdout,
     }

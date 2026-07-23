@@ -583,6 +583,21 @@ async def experiment_handler(request: web.Request) -> web.Response:
     return web.json_response(run)
 
 
+async def experiment_diff_handler(request: web.Request) -> web.Response:
+    """Side-by-side code diff of two full runs via system `difft`.
+
+    Query: `path`, `a` (base run id), `b` (updated run id).
+    """
+    path = request.query["path"]
+    a_id = request.query["a"]
+    b_id = request.query["b"]
+    # difft can take a moment on large notebooks; don't block the event loop.
+    result = await asyncio.to_thread(
+        experiments.diff_run_code, _project_dir, path, a_id, b_id
+    )
+    return web.json_response(result)
+
+
 async def artifact_handler(request: web.Request) -> web.FileResponse | web.Response:
     """Serve one artifact file for download. `file` is the absolute path recorded
     in a run's meta (see fw.log_artifact / experiments.finalize_run). It is served
@@ -1046,6 +1061,7 @@ async def main(project_dir: Path, *, host: str = "0.0.0.0", port: int = 7777) ->
     app.router.add_get("/notebooks", notebooks_handler)
     app.router.add_get("/experiments", experiments_handler)
     app.router.add_get("/experiment", experiment_handler)
+    app.router.add_get("/experiment/diff", experiment_diff_handler)
     app.router.add_get("/artifact", artifact_handler)
     app.router.add_get("/", index_handler)
     app.router.add_static("/", STATIC_DIR)

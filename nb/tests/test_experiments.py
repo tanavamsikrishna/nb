@@ -272,6 +272,33 @@ def test_artifact_path_writes_into_current_run_dir(tmp_path: Path) -> None:
         fw._current_run_dir, fw._artifacts = old_dir, old_list
 
 
+def test_diff_run_code_identical(tmp_path: Path) -> None:
+    nb_path = "/proj/example.py"
+    code = "# %%\nx = 1\n"
+    a = _save_full(tmp_path, nb_path, [_cell(0, [])], code=code)
+    b = _save_full(tmp_path, nb_path, [_cell(0, [])], code=code)
+    result = experiments.diff_run_code(tmp_path, nb_path, a, b)
+    assert result["identical"] is True
+    assert result["diff"] == ""
+    assert result["a"]["run_id"] == a
+    assert result["b"]["run_id"] == b
+
+
+def test_diff_run_code_differs(tmp_path: Path) -> None:
+    nb_path = "/proj/example.py"
+    a = _save_full(tmp_path, nb_path, [_cell(0, [])], code="# %%\nx = 1\n")
+    b = _save_full(tmp_path, nb_path, [_cell(0, [])], code="# %%\nx = 2\n")
+    try:
+        result = experiments.diff_run_code(tmp_path, nb_path, a, b)
+    except FileNotFoundError:
+        # difft not installed in this environment.
+        return
+    assert result["identical"] is False
+    assert result["diff"]  # non-empty side-by-side body
+    assert result["a"]["run_id"] == a
+    assert result["b"]["run_id"] == b
+
+
 def test_artifact_path_falls_back_to_temp_dir_outside_run() -> None:
     # With no active run, artifact_path creates the file in a fresh temp dir,
     # keeping the requested file name.

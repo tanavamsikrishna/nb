@@ -4,6 +4,9 @@
   Fetches GET /experiments?path= (a parent/child forest, newest-first) and lists
   each full run with its partial child runs nested underneath. Every run links to
   its read-only viewer at ?path=<path>&run=<run_id>.
+
+  Full (top-level) runs can be multi-selected (max 2) to open a code diff modal
+  via GET /experiment/diff (server-side difft).
 -->
 <script lang="ts">
   import { onMount } from "svelte";
@@ -13,6 +16,7 @@
     ParamsMap,
   } from "../lib/types";
   import AppShell from "./AppShell.svelte";
+  import CodeDiffModal from "./CodeDiffModal.svelte";
 
   let { path }: { path: string } = $props();
 
@@ -20,7 +24,21 @@
   let loaded = $state(false);
   let failed = $state(false);
 
+  /** Selected full-run ids (at most two). */
+  let selectedIds = $state<string[]>([]);
+  let showDiff = $state(false);
+
   let name = $derived(path.split("/").pop() || path);
+  let canCompare = $derived(runs.length >= 2);
+  let selectedSet = $derived(new Set(selectedIds));
+  // run_ids are timestamp-prefixed → lexical order is chronological (older first).
+  let pair = $derived(
+    selectedIds.length === 2
+      ? selectedIds[0] <= selectedIds[1]
+        ? ([selectedIds[0], selectedIds[1]] as [string, string])
+        : ([selectedIds[1], selectedIds[0]] as [string, string])
+      : null,
+  );
 
   function runHref(runId: string): string {
     return (
@@ -96,20 +114,79 @@
   {/if}
 </AppShell>
 
-{#snippet runRow(run: ExperimentRun, isChild: boolean)}
-  <a class="run-item {isChild ? 'child' : ''}" href={runHref(run.run_id)}>
-    <span class="run-top">
-      <span class="run-status {run.status}">{run.status}</span>
-      <span class="run-when">{when(run.started_at)}</span>
-      <span class="run-dur">{duration(run.dur_ms)}</span>
-      {#if isChild}
-        <span class="run-cells">cells {run.cell_ids.join(", ")}</span>
+{#if canCompare && selectedIds.length > 0}
+  <div class="compare-bar" role="region" aria-label="Compare selection">
+    <span class="compare-count">
+      {#if pair}
+        2 selected
+      {:else}
+        Select one more run to compare
       {/if}
     </span>
-    {#if paramSummary(run.params)}
-      <span class="run-params">{paramSummary(run.params)}</span>
+    <div class="compare-actions">
+      <button
+        type="button"
+        class="btn primary"
+        disabled={!pair}
+        onclick={() => (showDiff = true)}
+      >
+        Compare code
+      </button>
+      <button
+        type="button"
+        class="btn ghost"
+        onclick={() => {
+          selectedIds = [];
+          showDiff = false;
+        }}
+      >
+        Clear
+      </button>
+    </div>
+  </div>
+{/if}
+
+{#if showDiff && pair}
+  <CodeDiffModal
+    {path}
+    aId={pair[0]}
+    bId={pair[1]}
+    onclose={() => (showDiff = false)}
+  />
+{/if}
+
+{#snippet runRow(run: ExperimentRun, isChild: boolean)}
+  {@const checked = selectedSet.has(run.run_id)}
+  <div class="run-row {isChild ? 'child' : ''} {checked ? 'selected' : ''}">
+    {#if !isChild && canCompare}
+      <label class="run-check" title="Select for code compare">
+        <input
+          type="checkbox"
+          {checked}
+          disabled={!checked && selectedIds.length >= 2}
+          onchange={(e) => {
+            const on = e.currentTarget.checked;
+            selectedIds = on
+              ? [...selectedIds, run.run_id]
+              : selectedIds.filter((id) => id !== run.run_id);
+          }}
+        />
+      </label>
     {/if}
-  </a>
+    <a class="run-item" href={runHref(run.run_id)}>
+      <span class="run-top">
+        <span class="run-status {run.status}">{run.status}</span>
+        <span class="run-when">{when(run.started_at)}</span>
+        <span class="run-dur">{duration(run.dur_ms)}</span>
+        {#if isChild}
+          <span class="run-cells">cells {run.cell_ids.join(", ")}</span>
+        {/if}
+      </span>
+      {#if paramSummary(run.params)}
+        <span class="run-params">{paramSummary(run.params)}</span>
+      {/if}
+    </a>
+  </div>
 {/snippet}
 
 <style>
@@ -134,7 +211,40 @@
     padding-left: 12px;
   }
 
+  .run-row {
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .run-row.selected .run-item {
+    border-color: var(--color-primary);
+    background: var(--bg-sunken);
+  }
+
+  .run-check {
+    display: flex;
+    align-items: center;
+    padding: 0 4px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .run-check input {
+    width: 15px;
+    height: 15px;
+    cursor: pointer;
+    accent-color: var(--color-primary);
+  }
+
+  .run-check input:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+
   .run-item {
+    flex: 1;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     gap: 4px;
@@ -154,7 +264,7 @@
     background: var(--bg-sunken);
   }
 
-  .run-item.child {
+  .run-row.child .run-item {
     background: var(--bg-elevated);
   }
 
@@ -199,5 +309,73 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .compare-bar {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 18px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+    font-family: var(--font-sans);
+    font-size: 0.85rem;
+    max-width: calc(100vw - 32px);
+  }
+
+  .compare-count {
+    color: var(--fg-primary);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .compare-actions {
+    display: flex;
+    gap: 8px;
+    margin-left: auto;
+  }
+
+  .btn {
+    font-family: var(--font-sans);
+    font-size: 0.8rem;
+    font-weight: 500;
+    padding: 6px 14px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-default);
+    background: var(--bg-elevated);
+    color: var(--fg-primary);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .btn:hover:not(:disabled) {
+    border-color: var(--color-primary);
+  }
+
+  .btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  .btn.primary {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: var(--fg-on-accent);
+  }
+
+  .btn.primary:hover:not(:disabled) {
+    background: var(--color-interactive-hover);
+    border-color: var(--color-interactive-hover);
+  }
+
+  .btn.ghost {
+    background: transparent;
   }
 </style>

@@ -124,6 +124,25 @@ export interface ExperimentDetail {
   cells: Cell[];
 }
 
+/** One side of a code diff (`GET /experiment/diff`). */
+export interface ExperimentDiffSide {
+  run_id: string;
+  started_at: string;
+  status: "ok" | "error";
+  params: ParamsMap;
+}
+
+/**
+ * Side-by-side code diff of two full runs. `diff` is difftastic stdout and may
+ * contain ANSI color escapes (rendered client-side).
+ */
+export interface ExperimentDiffResponse {
+  a: ExperimentDiffSide;
+  b: ExperimentDiffSide;
+  identical: boolean;
+  diff: string;
+}
+
 /* ── SSE event payloads (the `data` field of each event; see nb/runner.py) ── */
 
 export interface CellManifestItem {
