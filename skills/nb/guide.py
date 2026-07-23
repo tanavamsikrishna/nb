@@ -1,7 +1,13 @@
 """
-Specification/Documentation
+**guide.py — nb API reference notebook**
 
-This module-level docstring is rendered as the notebook description in the UI.
+Annotated examples for `display`, `@nb_cache`, params, and artifacts. Open or run
+this file when you need the full API surface; the `nb` skill covers structure and
+workflow.
+
+Keep real analysis notebooks' module docstrings short: meaning and interpretation
+of the experiment, not an implementation walkthrough (see the skill's "Module
+docstring" section).
 """
 
 # %% Setup
