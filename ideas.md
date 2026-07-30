@@ -1,3 +1,4 @@
 - Can function purity linter be extended to flag free variable modifications?
-- [x] The spec section's expanded/collapsed state should be controlled by a single global variable (shared across notebooks and across live & experiment view). Collapsed by default.
-- [ ] Support for deleting experiments from UI and auto-deleting based on some parameters. Brainstorming needed.
+- [x] The spec section's expanded/collapsed state should be controlled by a single global variable (shared across notebooks and across live & experiment view). Collapsed by default.- [ ] Support for deleting experiments from UI and auto-deleting based on some parameters. Brainstorming needed.
+- [ ] Can `concurrent.interpreters` improve the design?
+
