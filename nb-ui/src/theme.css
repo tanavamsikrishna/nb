@@ -9,9 +9,10 @@
 :root {
   /* Typography — sans UI/prose, mono for data & code */
   --font-serif:
-    "Inter", system-ui, -apple-system, sans-serif; /* was New York/Georgia */
+    "Inter", system-ui, -apple-system, sans-serif;
+  /* was New York/Georgia */
   --font-sans: "Inter", system-ui, -apple-system, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-mono: "MonaspiceNe Nerd Font", "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 
   /* Backgrounds — warm paper, distinct steps (not a single wash) */
   --bg-base: #f7f6f3;

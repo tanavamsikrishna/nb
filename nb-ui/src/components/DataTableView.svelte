@@ -196,8 +196,8 @@
   }
 
   // Value shown in the cell: temporal columns are formatted as date/time
-  // strings; numeric columns are rounded to SIG_FIGS. The full / unambiguous
-  // value is preserved in the hover tooltip (see tooltipValue + template).
+  // strings; numeric columns are rounded to SIG_FIGS. When the display hides
+  // information, cellTooltip supplies a hover value (see below).
   function displayValue(value: any, col: Column) {
     const t = col.temporal;
     if (t) {
@@ -214,25 +214,46 @@
     return value;
   }
 
-  // Hover tooltip value. Cells are shown to second resolution; the tooltip
-  // carries the full sub-second detail (and, for tz-aware timestamps, the
-  // unambiguous UTC instant). Naive timestamps and times only get a tooltip
-  // when they actually have sub-second detail to reveal; dates never do.
-  // Non-temporal columns fall back to the full untruncated/unrounded value.
-  function tooltipValue(value: any, col: Column) {
+  // Hover tooltip: type rules when the cell text compresses the value, else
+  // CSS overflow detection for strings (and anything else that only needs a
+  // tooltip when the ellipsis is real).
+  //
+  // Type rules:
+  //   - tz-aware timestamp → always UTC ISO (unambiguous instant)
+  //   - naive timestamp / time → only when sub-second detail exists
+  //   - date → no type compression (overflow-only if somehow clipped)
+  //   - numeric → full value when 5-sig-fig display differs; else overflow-only
+  // Strings / other: full text only when the <td> is visually clipped.
+  function cellTooltip(
+    value: any,
+    col: Column,
+  ): { value: unknown; onlyIfOverflow?: boolean } | null {
     if (value === null || value === undefined) return null;
     const t = col.temporal;
     if (t?.kind === "timestamp") {
-      if (t.local) return `${new Date(num(value)).toISOString()} (UTC)`;
+      if (t.local) {
+        return { value: `${new Date(num(value)).toISOString()} (UTC)` };
+      }
       const full = fmtTimestamp(value, false, true);
-      return full !== fmtTimestamp(value, false) ? full : null;
+      return full !== fmtTimestamp(value, false) ? { value: full } : null;
     }
     if (t?.kind === "time") {
       const full = fmtTime(value, t.unit, true);
-      return full !== fmtTime(value, t.unit) ? full : null;
+      return full !== fmtTime(value, t.unit) ? { value: full } : null;
     }
-    if (t) return null; // date: no sub-second detail
-    return value;
+    if (t?.kind === "date") {
+      return { value: fmtDate(value), onlyIfOverflow: true };
+    }
+    if (
+      col.numeric &&
+      (typeof value === "number" || typeof value === "bigint")
+    ) {
+      const display = toSigFigs(value);
+      const full = String(value);
+      if (display !== full) return { value: full };
+      return { value: full, onlyIfOverflow: true };
+    }
+    return { value, onlyIfOverflow: true };
   }
 
   function submit() {
@@ -317,7 +338,7 @@
             {#each columns as col}
               <td
                 class:numeric={col.numeric}
-                use:tooltip={tooltipValue(row[col.name], col)}
+                use:tooltip={cellTooltip(row[col.name], col)}
               >
                 {#if row[col.name] === null}
                   <span class="null-val">—</span>
@@ -487,7 +508,8 @@
     border-bottom: 1px solid var(--border-subtle);
     color: var(--fg-primary);
     /* Hug content on one line, capped at the same generous max-width as the
-       header; full value is available via the cell's title tooltip. */
+       header. Clipped text is revealed via use:tooltip (type rules or
+       onlyIfOverflow when the ellipsis is real). */
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;

@@ -7,10 +7,15 @@
  * or scroll clipping, so it works the same inside table cells, scroll
  * containers, and plain inline text.
  *
- * Usage:  <span use:tooltip={fullValue}>{truncatedValue}</span>
+ * Usage:
+ *   <span use:tooltip={fullValue}>{truncatedValue}</span>
+ *   <td use:tooltip={{ value: full, onlyIfOverflow: true }}>{text}</td>
  *
- * A null/undefined/empty value suppresses the tooltip. The tooltip flips above
- * the node, or shifts left, when it would overflow the viewport edge.
+ * A null/undefined/empty value suppresses the tooltip. With `onlyIfOverflow`,
+ * the tooltip is also suppressed unless the node is visually clipped
+ * (`scrollWidth > clientWidth`) — measured at show time so resize/font changes
+ * stay correct. The tooltip flips above the node, or shifts left, when it
+ * would overflow the viewport edge.
  *
  * Styling lives in the global `.tooltip-floating` class (app.css) because the
  * element is mounted outside any component's scoped-style tree.
@@ -18,6 +23,33 @@
 
 const GAP = 4; // px between the node and the tooltip
 const MARGIN = 8; // px min distance kept from the viewport edges
+// Subpixel layouts can report scrollWidth === clientWidth + fraction; require
+// a full pixel of overflow before treating the node as clipped.
+const OVERFLOW_TOLERANCE_PX = 1;
+
+export type TooltipParam =
+  | unknown
+  | { value: unknown; onlyIfOverflow?: boolean };
+
+function resolveParam(param: TooltipParam): {
+  value: unknown;
+  onlyIfOverflow: boolean;
+} {
+  if (
+    param !== null &&
+    typeof param === "object" &&
+    !Array.isArray(param) &&
+    "value" in (param as object)
+  ) {
+    const p = param as { value: unknown; onlyIfOverflow?: boolean };
+    return { value: p.value, onlyIfOverflow: !!p.onlyIfOverflow };
+  }
+  return { value: param, onlyIfOverflow: false };
+}
+
+function isOverflowing(node: HTMLElement): boolean {
+  return node.scrollWidth > node.clientWidth + OVERFLOW_TOLERANCE_PX;
+}
 
 // One shared element reused by every `use:tooltip` node.
 let el: HTMLDivElement | null = null;
@@ -53,11 +85,12 @@ function place(node: HTMLElement, tip: HTMLDivElement) {
   tip.style.top = `${top}px`;
 }
 
-export function tooltip(node: HTMLElement, value: unknown) {
-  let current = value;
+export function tooltip(node: HTMLElement, param: TooltipParam) {
+  let { value: current, onlyIfOverflow } = resolveParam(param);
 
   function show() {
     if (current === null || current === undefined || current === "") return;
+    if (onlyIfOverflow && !isOverflowing(node)) return;
     const tip = ensureEl();
     tip.textContent = String(current);
     tip.style.display = "block";
@@ -72,13 +105,21 @@ export function tooltip(node: HTMLElement, value: unknown) {
   node.addEventListener("mouseleave", hide);
 
   return {
-    update(next: unknown) {
-      current = next;
+    update(next: TooltipParam) {
+      const resolved = resolveParam(next);
+      current = resolved.value;
+      onlyIfOverflow = resolved.onlyIfOverflow;
       // Keep a currently-visible tooltip in sync (e.g. data swapped on re-run).
       if (el && el.style.display === "block") {
-        if (next === null || next === undefined || next === "") hide();
-        else {
-          el.textContent = String(next);
+        if (
+          current === null ||
+          current === undefined ||
+          current === "" ||
+          (onlyIfOverflow && !isOverflowing(node))
+        ) {
+          hide();
+        } else {
+          el.textContent = String(current);
           place(node, el);
         }
       }
