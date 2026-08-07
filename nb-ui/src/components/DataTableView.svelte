@@ -2,7 +2,7 @@
   DataTableView.svelte — Interactive table with SQL query.
 
   Receives a DuckDB connection and view name, manages all interactive state:
-  SQL editing, display limited to first 25 rows.
+  SQL editing, display limited to first MAX_DISPLAY_ROWS rows.
 
   Props:
     conn       AsyncDuckDB.Connection  — active DuckDB connection
@@ -42,7 +42,7 @@
 
   type Row = Record<string, any>;
 
-  const MAX_DISPLAY_ROWS = 25;
+  const MAX_DISPLAY_ROWS = 15;
 
   const {
     conn,
@@ -90,7 +90,7 @@
         };
       });
 
-      // Convert Arrow table to array of row objects (first 25 only)
+      // Convert Arrow table to array of row objects (first MAX_DISPLAY_ROWS only)
       const displayRows = Math.min(dataResult.numRows, MAX_DISPLAY_ROWS);
       rows = [];
       for (let i = 0; i < displayRows; i++) {
