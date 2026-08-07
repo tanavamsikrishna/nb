@@ -9,6 +9,8 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import type { ExperimentDetail } from "../lib/types";
+  import { notebookBasename } from "../lib/notebookPath";
+  import { tooltip } from "../lib/tooltip";
   import AppShell from "./AppShell.svelte";
   import NotebookView from "./NotebookView.svelte";
 
@@ -24,8 +26,6 @@
   let experimentDetail = $state.raw<ExperimentDetail | null>(null);
   let loaded = $state(false);
   let failed = $state(false);
-
-  let name = $derived(path.split("/").pop() || path);
 
   function experimentsHref(): string {
     return "/?view=experiments&path=" + encodeURIComponent(path);
@@ -63,7 +63,7 @@
     <span class="logo-separator">/</span>
     <a class="logo-sub logo-link" href={experimentsHref()}>experiments</a>
     <span class="logo-separator">/</span>
-    <span class="notebook-name">{name}</span>
+    <span class="notebook-name" use:tooltip={path}>{notebookBasename(path)}</span>
   {/snippet}
 
   {#if loaded && experimentDetail}

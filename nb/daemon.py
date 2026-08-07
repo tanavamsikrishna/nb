@@ -533,8 +533,13 @@ async def notebooks_handler(request: web.Request) -> web.Response:
     """List notebooks for the index page: the union of those the daemon currently
     holds live state for (streamable at `/?path=<path>`) and those with stored
     experiments (browsable at `/?view=experiments&path=<path>`) even when no
-    session is live. `num_cells` is 0 for an experiments-only notebook."""
+    session is live. `num_cells` is 0 for an experiments-only notebook.
+
+    Ordered most-recent experiment first (`last_run_id` is time-sortable); notebooks
+    with no saved runs fall to the bottom, path as tiebreaker.
+    """
     by_path: dict[str, NotebookEntry] = {}
+    last_run: dict[str, str] = {}
     for path, session in _sessions.items():
         by_path[path] = NotebookEntry(
             path=path,
@@ -555,8 +560,14 @@ async def notebooks_handler(request: web.Request) -> web.Response:
             )
             by_path[nb.path] = entry
         entry.has_experiments = nb.run_count > 0
+        last_run[nb.path] = nb.last_run_id
 
-    notebooks = sorted(by_path.values(), key=lambda nb: nb.path)
+    # reverse=True: newer run_id strings first; path secondary for equal/missing keys.
+    notebooks = sorted(
+        by_path.values(),
+        key=lambda nb: (last_run.get(nb.path, ""), nb.path),
+        reverse=True,
+    )
     return web.Response(
         body=msgspec.json.encode({"notebooks": notebooks}),
         content_type="application/json",

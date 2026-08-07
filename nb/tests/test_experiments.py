@@ -73,15 +73,18 @@ def test_params_saved_into_meta(tmp_path: Path) -> None:
 
 
 def test_list_notebooks(tmp_path: Path) -> None:
-    _save_full(tmp_path, "/proj/a.py", [_cell(0, [])])
-    _save_full(tmp_path, "/proj/a.py", [_cell(0, [])])
-    _save_full(tmp_path, "/proj/b.py", [_cell(0, [])])
+    a1 = _save_full(tmp_path, "/proj/a.py", [_cell(0, [])])
+    a2 = _save_full(tmp_path, "/proj/a.py", [_cell(0, [])])
+    b1 = _save_full(tmp_path, "/proj/b.py", [_cell(0, [])])
 
     nbs = {nb.path: nb for nb in experiments.list_notebooks(tmp_path)}
     assert set(nbs) == {"/proj/a.py", "/proj/b.py"}
     assert nbs["/proj/a.py"].run_count == 2
     assert nbs["/proj/a.py"].name == "a.py"
     assert nbs["/proj/b.py"].run_count == 1
+    # last_run_id is the max (most recent) run directory name.
+    assert nbs["/proj/a.py"].last_run_id == max(a1, a2)
+    assert nbs["/proj/b.py"].last_run_id == b1
 
 
 def test_same_basename_different_dirs_dont_collide(tmp_path: Path) -> None:

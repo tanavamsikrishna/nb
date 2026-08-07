@@ -9,6 +9,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import type { NotebookListItem, NotebooksResponse } from "../lib/types";
+  import { prettyNotebookTitle } from "../lib/notebookPath";
   import AppShell from "./AppShell.svelte";
 
   let notebooks = $state<NotebookListItem[]>([]);
@@ -58,7 +59,7 @@
       {#each notebooks as nb (nb.path)}
         <li>
           <div class="nb-item">
-            <span class="nb-name">{nb.name}</span>
+            <span class="nb-name">{prettyNotebookTitle(nb.name)}</span>
             <span class="nb-path">{nb.path}</span>
             <span class="nb-meta">
               {#if nb.active}

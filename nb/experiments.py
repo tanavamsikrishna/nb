@@ -41,6 +41,9 @@ class NotebookInfo(msgspec.Struct):
     path: str
     name: str
     run_count: int
+    # Max run directory name among saved runs. run_ids are minted as
+    # YYYYMMDD-HHMMSS-ffffff-xxxx so lexical max == most recent run.
+    last_run_id: str = ""
 
 # run_id is minted by us and only ever travels back as an opaque token; still,
 # validate it before joining onto a filesystem path (it arrives over HTTP).
@@ -184,7 +187,11 @@ def save_run(
 
 
 def list_notebooks(root: Any) -> list[NotebookInfo]:
-    """Every notebook that has at least one stored experiment."""
+    """Every notebook that has at least one stored experiment.
+
+    `last_run_id` is the max run directory name (run_ids are time-sortable), so
+    callers can order notebooks most-recent-first without reading meta.json.
+    """
     store = _store_dir(root)
     out: list[NotebookInfo] = []
     if not store.is_dir():
@@ -197,8 +204,21 @@ def list_notebooks(root: Any) -> list[NotebookInfo]:
             info = json.loads(nb_json.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             continue
-        run_count = sum(1 for d in nb_dir.iterdir() if d.is_dir() and (d / "meta.json").is_file())
-        out.append(NotebookInfo(path=info["path"], name=info["name"], run_count=run_count))
+        run_count = 0
+        last_run_id = ""
+        for d in nb_dir.iterdir():
+            if d.is_dir() and (d / "meta.json").is_file():
+                run_count += 1
+                if d.name > last_run_id:
+                    last_run_id = d.name
+        out.append(
+            NotebookInfo(
+                path=info["path"],
+                name=info["name"],
+                run_count=run_count,
+                last_run_id=last_run_id,
+            )
+        )
     return out
 
 

@@ -58,32 +58,7 @@ body {
   text-decoration: underline;
 }
 
-/* Path chip in the live stream breadcrumb */
-.notebook-path {
-  font-size: 0.75rem;
-  color: var(--fg-tertiary);
-  font-family: var(--font-mono);
-  font-weight: 400;
-  text-transform: none;
-  letter-spacing: normal;
-  margin-left: 8px;
-  padding: 2px 8px;
-  background: var(--bg-sunken);
-  border-radius: var(--radius-sm);
-}
-
-.notebook-path-text {
-  display: block;
-  max-width: 300px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  /* Left-truncate so the filename (end of the path) stays visible. */
-  direction: rtl;
-  text-align: left;
-}
-
-/* Name chip in experiments breadcrumbs */
+/* Basename chip in notebook breadcrumbs (full path on hover via use:tooltip) */
 .notebook-name {
   font-size: 0.8rem;
   color: var(--fg-tertiary);
@@ -94,6 +69,7 @@ body {
   padding: 2px 8px;
   background: var(--bg-sunken);
   border-radius: var(--radius-sm);
+  cursor: default;
 }
 
 /* ── Empty state ──────────────────────────────────────────────────────── */

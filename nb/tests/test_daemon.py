@@ -555,14 +555,25 @@ async def test_notebooks_listing_and_path_scoped_stream(tmp_path: Path) -> None:
         await _run_request(socket_path, {"path": str(a_path)})
         await _run_request(socket_path, {"path": str(b_path)})
 
-        # /notebooks lists both notebooks the daemon has run.
+        # /notebooks lists both notebooks the daemon has run, most recent first.
         async with aiohttp.ClientSession() as session:
             async with session.get(f"http://127.0.0.1:{port}/notebooks") as resp:
                 assert resp.status == 200
                 data = await resp.json()
+        paths = [nb["path"] for nb in data["notebooks"]]
         by_path = {nb["path"]: nb for nb in data["notebooks"]}
         assert str(a_path) in by_path and str(b_path) in by_path
         assert by_path[str(a_path)]["name"] == "a.py"
+        # b ran after a, so it should sort first (last_run_id order).
+        assert paths.index(str(b_path)) < paths.index(str(a_path))
+
+        # Re-run a; it becomes the most recent and should sort first.
+        await _run_request(socket_path, {"path": str(a_path)})
+        async with aiohttp.ClientSession() as session:
+            async with session.get(f"http://127.0.0.1:{port}/notebooks") as resp:
+                data = await resp.json()
+        paths = [nb["path"] for nb in data["notebooks"]]
+        assert paths.index(str(a_path)) < paths.index(str(b_path))
 
         # Each /stream client is served its own notebook's snapshot.
         assert _snapshot_payloads(daemon._session_for_stream(str(a_path))) == [111]

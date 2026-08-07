@@ -15,6 +15,8 @@
     ExperimentsResponse,
     ParamsMap,
   } from "../lib/types";
+  import { notebookBasename } from "../lib/notebookPath";
+  import { tooltip } from "../lib/tooltip";
   import AppShell from "./AppShell.svelte";
   import CodeDiffModal from "./CodeDiffModal.svelte";
 
@@ -28,7 +30,6 @@
   let selectedIds = $state<string[]>([]);
   let showDiff = $state(false);
 
-  let name = $derived(path.split("/").pop() || path);
   let canCompare = $derived(runs.length >= 2);
   let selectedSet = $derived(new Set(selectedIds));
   // run_ids are timestamp-prefixed → lexical order is chronological (older first).
@@ -84,7 +85,8 @@
     <a class="logo-nb logo-home" href="/" title="All notebooks">nb</a>
     <span class="logo-separator">/</span>
     <span class="logo-sub">experiments</span>
-    <span class="notebook-name">{name}</span>
+    <span class="logo-separator">/</span>
+    <span class="notebook-name" use:tooltip={path}>{notebookBasename(path)}</span>
   {/snippet}
 
   {#if loaded && runs.length > 0}

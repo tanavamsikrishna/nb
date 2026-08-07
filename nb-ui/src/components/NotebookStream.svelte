@@ -9,6 +9,7 @@
   import { onMount } from "svelte";
   import { notebook, view } from "../stores/notebook.svelte";
   import { connectStream } from "../lib/stream";
+  import { notebookBasename } from "../lib/notebookPath";
   import { tooltip } from "../lib/tooltip";
   import AppShell from "./AppShell.svelte";
   import NotebookView from "./NotebookView.svelte";
@@ -25,11 +26,8 @@
     <a class="logo-nb logo-home" href="/" title="All notebooks">nb</a>
     <span class="logo-separator">/</span>
     <span class="logo-sub">notebook stream</span>
-    {#if notebook.path}
-      <span class="notebook-path" use:tooltip={notebook.path}>
-        <span class="notebook-path-text">{"‎" + notebook.path}</span>
-      </span>
-    {/if}
+    <span class="logo-separator">/</span>
+    <span class="notebook-name" use:tooltip={path}>{notebookBasename(path)}</span>
   {/snippet}
 
   {#snippet aside()}
