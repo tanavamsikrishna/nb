@@ -9,7 +9,9 @@
   hero title) is always rendered identically — it never moves or restyles.
   Toggling only shows/hides the body below it. Collapsed by default so cells
   stay front-and-centre. The title heading is hoisted into the row and
-  stripped from the body so it isn't shown twice.
+  stripped from the body so it isn't shown twice. The body is measure-capped
+  (~68ch) and centered so hard-wrapped docstring prose does not span the
+  full card.
 
   Props:
     docstring  string  — raw Markdown content (default: "")
@@ -90,9 +92,11 @@
     cursor: pointer;
   }
 
-  /* Body appears below the title row when expanded. */
+  /* Body appears below the title row when expanded. Capped to a readable
+     measure and centered so it does not run edge-to-edge on a wide card. */
   .notebook-header :global(.markdown--hero) {
-    margin-top: 14px;
+    max-width: 68ch;
+    margin: 14px auto 0;
   }
 
   .chev {

@@ -7,23 +7,26 @@
   Props:
     source   string            — raw Markdown text (default: "")
     variant  "inline" | "hero" — rendering context (default: "inline")
-      "inline" — compact cell output (tighter spacing, smaller headings)
-      "hero"   — prominent card header (large headings, gradient h1)
+      "inline" — compact cell output (tighter spacing, smaller headings).
+                 Single newlines become <br> (Jupyter-style).
+      "hero"   — prominent card header (large headings). Single newlines are
+                 spaces so hard-wrapped Python docstrings reflow as prose.
 
-  Dependencies: marked (markdown → HTML, configured with `breaks: true`).
+  Dependencies: marked / markedProse from $lib/marked.
   Exports: None (render-only component).
   Side-effects: None.
   Constraints: Svelte 5 runes ($props, $derived).
 -->
 <script lang="ts">
-  import { marked } from "$lib/marked";
+  import { marked, markedProse } from "$lib/marked";
 
   let {
     source = "",
     variant = "inline",
   }: { source?: string; variant?: "inline" | "hero" } = $props();
 
-  let html = $derived(source ? marked.parse(source) : "");
+  const parser = $derived(variant === "hero" ? markedProse : marked);
+  let html = $derived(source ? parser.parse(source) : "");
 </script>
 
 <div class="markdown markdown--{variant}">
@@ -91,9 +94,23 @@
     background: var(--bg-sunken);
   }
 
+  /* Global * { margin: 0 } would otherwise collapse paragraphs/lists. */
+  .markdown :global(p) {
+    margin: 0 0 0.75em;
+  }
+
+  .markdown :global(p:last-child) {
+    margin-bottom: 0;
+  }
+
   .markdown :global(ol),
   .markdown :global(ul) {
-    margin-left: 1rem;
+    margin: 0 0 0.75em 1rem;
+  }
+
+  .markdown :global(ol:last-child),
+  .markdown :global(ul:last-child) {
+    margin-bottom: 0;
   }
 
   /* ── Variant: inline (cell output) ──────────────────────────────── */
