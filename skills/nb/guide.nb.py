@@ -1,5 +1,5 @@
 """
-**guide.py — nb API reference notebook**
+**guide.nb.py — nb API reference notebook**
 
 Annotated examples for `display`, `@nb_cache`, params, and artifacts. Open or run
 this file when you need the full API surface; the `nb` skill covers structure and

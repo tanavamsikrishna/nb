@@ -118,5 +118,5 @@ cd nb-ui && pnpm dev                  # vite dev server (proxies /stream -> :777
 cd nb-ui && pnpm format               # prettier
 ```
 
-The full annotated API reference lives in [`skills/nb/guide.py`](skills/nb/guide.py) and
+The full annotated API reference lives in [`skills/nb/guide.nb.py`](skills/nb/guide.nb.py) and
 [`skills/nb/skill.md`](skills/nb/skill.md); [`example.py`](example.py) is a working sample notebook.

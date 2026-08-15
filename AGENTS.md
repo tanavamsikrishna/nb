@@ -82,4 +82,4 @@ removing absent ones after `run_end`) so scroll position is preserved across run
 ## Notebook authoring
 
 When writing or editing `.py` notebooks, the canonical, up-to-date API reference is
-`skills/nb/guide.py` (annotated) and `skills/nb/skill.md`. `example.py` is a working sample.
+`skills/nb/guide.nb.py` (annotated) and `skills/nb/skill.md`. `example.py` is a working sample.

@@ -1,9 +1,10 @@
 ---
 name: nb
 description: >-
-  Use when writing or editing notebooks for the `nb` framework in this project.
-  Covers cell structure, module docstrings (file-level meaning contract), the
-  run/query/cache CLI workflow, and points to guide.py for display/@nb_cache.
+  Use when writing or editing `nb` framework notebooks. A file is an nb notebook
+  if and only if its name ends with `.nb.py`. Covers cell structure, module
+  docstrings (file-level meaning contract), the run/query/cache CLI workflow,
+  and points to guide.nb.py for display/@nb_cache.
 ---
 
 # nb — Python Notebook Framework
@@ -12,7 +13,7 @@ description: >-
 the daemon executes them cell-by-cell and streams output to a Svelte UI at
 `http://localhost:7777`.
 
-Read `skills/nb/guide.py` for the full annotated API reference.
+Read `skills/nb/guide.nb.py` for the full annotated API reference.
 
 ## Notebook Structure
 
@@ -127,7 +128,7 @@ uv run nb run <notebook.py>
 ```
 
 All `run`/`query` commands need the daemon; for pure authoring you only need
-`skills/nb/guide.py` and the cell-structure rules above.
+`skills/nb/guide.nb.py` and the cell-structure rules above.
 
 ## Querying State (for agents)
 
@@ -188,7 +189,7 @@ A full-notebook run is a *parent* experiment; a partial re-run
 (`nb run file.py:LINE`) is saved as a *child* of the most recent full run. Browse
 history from the index page's per-notebook **Experiments** link (parents
 newest-first, children nested); click a run to view its saved code, params, and
-outputs. See `skills/nb/guide.py` for the parameters and artifacts examples.
+outputs. See `skills/nb/guide.nb.py` for the parameters and artifacts examples.
 
 ## Cache Management
 
