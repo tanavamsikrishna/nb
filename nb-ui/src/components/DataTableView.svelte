@@ -42,7 +42,7 @@
 
   type Row = Record<string, any>;
 
-  const MAX_DISPLAY_ROWS = 15;
+  const MAX_DISPLAY_ROWS = 10;
 
   const {
     conn,
