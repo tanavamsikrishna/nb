@@ -1,23 +1,27 @@
 <!--
-  DataTableView.svelte — Interactive table with SQL query.
+  DataTableView.svelte — Interactive table with a caption-as-editor SQL query.
 
-  Receives a DuckDB connection and view name, manages all interactive state:
-  SQL editing, display limited to first MAX_DISPLAY_ROWS rows.
+  Receives a DuckDB connection and view name. SQL lives in a muted caption
+  above the grid: click (or Enter/Space) to edit, Enter to run, Escape to
+  cancel. Display is limited to the first MAX_DISPLAY_ROWS rows.
 
   Props:
     conn       AsyncDuckDB.Connection  — active DuckDB connection
     viewName   string  — name of the registered view (e.g. "t_2_0")
     totalRows  number  — total rows in the original DataFrame
-    label      string | null  — optional caption from display(..., label=...)
+    label      string | null  — optional title from display(..., label=...)
     reload     number  — bumped by the parent when the view's buffer is swapped
                          (re-run); re-executes the current query in place
 
   Dependencies: None (receives conn from parent)
   Exports: None (render-only component)
   Side-effects: Executes SQL queries against DuckDB on user interaction.
-  Constraints: conn must be an active AsyncDuckDB connection.
+  Constraints: conn must be an active AsyncDuckDB connection. Resting and
+    editing caption states share one row height so toggling does not shift
+    the table.
 -->
 <script lang="ts">
+  import { tick } from "svelte";
   import type { AsyncDuckDBConnection } from "@duckdb/duckdb-wasm";
   import { tooltip } from "../lib/tooltip";
 
@@ -61,13 +65,23 @@
   const defaultSql = `SELECT * FROM ${viewName} `;
   let sql = $state(defaultSql);
   let submittedSql = $state(defaultSql);
+  let editing = $state(false);
   let dirty = $derived(sql !== submittedSql);
+  let customized = $derived(submittedSql !== defaultSql);
+  let showReset = $derived(sql !== defaultSql);
 
   let rows = $state<Row[]>([]);
   let columns = $state<Column[]>([]);
   let totalResultRows = $state(0);
   let queryError = $state<string | null>(null);
   let loading = $state(false);
+
+  const defaultCount = $derived(
+    `${rows.length} of ${totalResultRows.toLocaleString()} rows shown (${totalRows.toLocaleString()} total in table)`,
+  );
+  const shortCount = $derived(
+    `${rows.length} of ${totalResultRows.toLocaleString()}`,
+  );
 
   async function execute() {
     loading = true;
@@ -258,20 +272,50 @@
 
   function submit() {
     submittedSql = sql;
+    editing = false;
     execute();
   }
 
   function reset() {
     sql = defaultSql;
     submittedSql = defaultSql;
+    editing = false;
     execute();
+  }
+
+  async function startEdit() {
+    editing = true;
+    await tick();
+    captionEl?.querySelector("input")?.focus();
   }
 
   function handleKeydown(e: KeyboardEvent) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       submit();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      sql = submittedSql;
+      editing = false;
     }
+  }
+
+  let captionEl: HTMLDivElement | undefined;
+
+  // Exit edit on click-outside. Deferred so unmounting the caption button
+  // (relatedTarget is null) doesn't cancel the edit before the input focuses.
+  // Run/Reset also mousedown-preventDefault so they don't steal focus.
+  function handleCaptionFocusOut() {
+    requestAnimationFrame(() => {
+      if (!captionEl) return;
+      const active = document.activeElement;
+      if (active && captionEl.contains(active)) return;
+      editing = false;
+    });
+  }
+
+  function keepFocus(e: MouseEvent) {
+    e.preventDefault();
   }
 
   // Initial execution
@@ -297,72 +341,113 @@
     <div class="table-label">{label}</div>
   {/if}
 
-  <!-- Query Box -->
-  <div class="query-bar">
-    <input
-      type="text"
-      class="query-input"
-      bind:value={sql}
-      onkeydown={handleKeydown}
-      spellcheck="false"
-      placeholder="Enter SQL query..."
-    />
-    <button class="btn btn-run" class:dirty onclick={submit} disabled={loading}>
-      Run{dirty ? " ●" : ""}
-    </button>
-    <button class="btn btn-reset" onclick={reset}>Reset</button>
-  </div>
+  <div class="table-block">
+    <!-- Caption: row counts at rest; same-height SQL editor when open. -->
+    <div
+      class="table-caption"
+      bind:this={captionEl}
+      onfocusout={handleCaptionFocusOut}
+    >
+      {#if editing}
+        <input
+          type="text"
+          class="query-input"
+          bind:value={sql}
+          onkeydown={handleKeydown}
+          spellcheck="false"
+          placeholder="SELECT …"
+          aria-label="SQL query"
+        />
+        {#if dirty}
+          <button
+            type="button"
+            class="btn btn-run dirty"
+            onclick={submit}
+            onmousedown={keepFocus}
+            disabled={loading}
+          >
+            Run ●
+          </button>
+        {/if}
+        {#if showReset}
+          <button
+            type="button"
+            class="btn btn-reset"
+            onclick={reset}
+            onmousedown={keepFocus}
+          >
+            Reset
+          </button>
+        {/if}
+      {:else}
+        <button
+          type="button"
+          class="caption-toggle"
+          onclick={startEdit}
+          title="Query this table"
+        >
+          {#if customized}
+            <!-- prettier-ignore -->
+            <span
+              class="caption-sql"
+              use:tooltip={{ value: submittedSql, onlyIfOverflow: true }}
+            >{submittedSql}</span><span class="caption-meta">
+              · {shortCount}</span
+            >
+          {:else}
+            <span class="caption-meta">{defaultCount}</span>
+          {/if}
+          {#if dirty}
+            <span class="dirty-dot" aria-hidden="true">●</span>
+          {/if}
+        </button>
+      {/if}
+    </div>
 
-  <!-- Error Display -->
-  {#if queryError}
-    <div class="query-error">{queryError}</div>
-  {/if}
+    {#if queryError}
+      <div class="query-error">{queryError}</div>
+    {/if}
 
-  <!-- Data Table -->
-  <div class="table-scroll" class:dimmed={loading}>
-    <table>
-      <thead>
-        <tr>
-          {#each columns as col}
-            <th class:numeric={col.numeric} title={col.name}>
-              <span class="col-name">{col.name}</span>
-              {#if col.zoneLabel}<span class="col-zone">({col.zoneLabel})</span
-                >{/if}
-            </th>
-          {/each}
-        </tr>
-      </thead>
-      <tbody>
-        {#each rows as row, i (i)}
+    <div class="table-scroll" class:dimmed={loading}>
+      <table>
+        <thead>
           <tr>
             {#each columns as col}
-              <td
-                class:numeric={col.numeric}
-                use:tooltip={cellTooltip(row[col.name], col)}
-              >
-                {#if row[col.name] === null}
-                  <span class="null-val">—</span>
-                {:else}
-                  {displayValue(row[col.name], col)}
-                {/if}
-              </td>
+              <th class:numeric={col.numeric} title={col.name}>
+                <span class="col-name">{col.name}</span>
+                {#if col.zoneLabel}<span class="col-zone"
+                    >({col.zoneLabel})</span
+                  >{/if}
+              </th>
             {/each}
           </tr>
-        {:else}
-          <tr>
-            <td colspan={columns.length || 1} class="empty-msg">
-              No results
-            </td>
-          </tr>
-        {/each}
-      </tbody>
-    </table>
-  </div>
-
-  <!-- Footer -->
-  <div class="footer">
-    {rows.length} of {totalResultRows.toLocaleString()} rows shown ({totalRows.toLocaleString()}
-    total in table)
+        </thead>
+        <tbody>
+          {#each rows as row, i (i)}
+            <tr>
+              {#each columns as col}
+                <td
+                  class:numeric={col.numeric}
+                  use:tooltip={cellTooltip(row[col.name], col)}
+                >
+                  {#if row[col.name] === null}
+                    <span class="null-val">—</span>
+                  {:else}
+                    {displayValue(row[col.name], col)}
+                  {/if}
+                </td>
+              {/each}
+            </tr>
+          {:else}
+            <tr>
+              <td colspan={columns.length || 1} class="empty-msg">
+                No results
+              </td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    </div>
   </div>
 </div>
 
@@ -380,47 +465,121 @@
     margin-bottom: 6px;
   }
 
-  /* Query Bar */
-  .query-bar {
+  /* Caption + table share one column sized by the grid. */
+  .table-block {
     display: flex;
-    gap: 8px;
-    margin-bottom: 8px;
+    flex-direction: column;
+    align-items: stretch;
+    width: max-content;
+    max-width: 100%;
+  }
+
+  /*
+    Resting and editing share this height so toggling (and Run/Reset
+    appearing) cannot shift the table. Input/buttons use a transparent 1px
+    border so focus never adds pixels.
+  */
+  .table-caption {
+    display: flex;
     align-items: center;
+    gap: 6px;
+    box-sizing: border-box;
+    height: 22px;
+    margin-bottom: 6px;
+    /* Don't contribute intrinsic width — the table sizes the block; the
+       caption stretches to that width and ellipsizes. */
+    width: 0;
+    min-width: 100%;
+    max-width: 100%;
+    font-size: 0.75rem;
+    line-height: 1.25;
+    color: var(--fg-secondary);
+    flex-wrap: nowrap;
+  }
+
+  .caption-toggle {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0 1px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    background: none;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    cursor: text;
+    overflow: hidden;
+  }
+
+  .caption-toggle:hover,
+  .caption-toggle:focus-visible {
+    color: var(--fg-primary);
+    outline: none;
+  }
+
+  .caption-sql {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--fg-secondary);
+  }
+
+  .caption-meta {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  .dirty-dot {
+    flex-shrink: 0;
+    margin-left: 6px;
+    color: var(--color-primary);
+    font-size: 0.65rem;
   }
 
   .query-input {
     flex: 1;
+    min-width: 0;
+    height: 100%;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0 1px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    font: inherit;
     font-family: var(--font-mono);
-    font-size: 0.7rem;
-    background: var(--bg-sunken);
     color: var(--fg-primary);
-    border: 1px solid var(--border-default);
-    border-radius: var(--radius-md);
-    padding: 8px 12px;
     outline: none;
-    transition: border-color 0.2s;
   }
 
   .query-input:focus {
-    border-color: var(--color-primary);
+    color: var(--fg-primary);
   }
 
   .btn {
-    font-size: 0.66rem;
+    box-sizing: border-box;
+    height: 100%;
+    flex-shrink: 0;
+    font: inherit;
+    font-size: 0.75rem;
     font-weight: 500;
-    padding: 8px 14px;
-    border-radius: var(--radius-md);
-    border: 1px solid var(--border-default);
-    background: var(--bg-muted);
+    padding: 0 8px;
+    border-radius: var(--radius-sm);
+    border: 1px solid transparent;
+    background: transparent;
     color: var(--fg-primary);
     cursor: pointer;
-    transition: all 0.2s;
     white-space: nowrap;
   }
 
   .btn:hover:not(:disabled) {
-    background: var(--bg-header);
-    border-color: var(--border-default);
+    color: var(--fg-primary);
+    background: var(--bg-sunken);
   }
 
   .btn:disabled {
@@ -429,7 +588,6 @@
   }
 
   .btn-run.dirty {
-    border-color: var(--color-primary);
     color: var(--color-primary);
     font-weight: 600;
   }
@@ -458,9 +616,9 @@
     border-radius: var(--radius-md);
     transition: opacity 0.2s;
     /* Shrink-wrap the bordered box to the table, but never exceed the
-       container — at which point overflow-x scrolls. The query bar above is a
-       separate full-width element, so it keeps its width. */
-    width: fit-content;
+       container — at which point overflow-x scrolls. The caption above
+       stretches to this same column width. */
+    width: max-content;
     max-width: 100%;
   }
 
@@ -535,18 +693,5 @@
     color: var(--fg-secondary);
     font-style: italic;
     padding: 16px;
-  }
-
-  /* Footer */
-  .footer {
-    font-size: 0.75rem;
-    color: var(--fg-secondary);
-    padding-top: 6px;
-    text-align: left;
-    /* Hug the table's width so the status reads directly under the table's
-       left edge rather than drifting to the far right of the full-width
-       wrapper. */
-    width: fit-content;
-    max-width: 100%;
   }
 </style>
