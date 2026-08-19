@@ -37,13 +37,14 @@ to interpret its results—not a design doc, not an implementation walkthrough, 
 not a table of contents for the cells below. Prefer plain language over formulas.
 Markdown is fine.
 
-Keep it short: typically a title plus a few short paragraphs. Length is a *smell*,
-not a hard cap—if it reads like a design doc, or lists cell outputs and formulas,
-cut until only interpretation-critical content remains.
+Keep it short: typically a `#` title plus a few short paragraphs. Length is a
+*smell*, not a hard cap—if it reads like a design doc, or lists cell outputs and
+formulas, cut until only interpretation-critical content remains.
 
 #### Should include
 
-- **Title + one-line purpose** — identity in the UI
+- **Title + one-line purpose** — `# Title` (level-1 heading), then a
+  short purpose line; identity in the UI
 - **Provenance** when relevant — paper, idea, or research question being tested
 - **Conceptual rules** — strategy or analysis in plain language (what is ranked,
   held, compared, etc.)
@@ -75,7 +76,7 @@ cut until only interpretation-critical content remains.
 
 ```python
 """
-**Relative Strength Allocation**
+# Relative Strength Allocation
 
 Replication of Faber (2010) relative-strength rotation on a configurable universe
 (default: NIFTY + GOLDBEES).

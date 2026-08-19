@@ -3,7 +3,8 @@
 
   Lists the notebooks the daemon currently holds state for (GET /notebooks) and
   links each to its per-notebook stream view at "/?path=<abs path>". Each row
-  shows the project-relative path (`rel`); a search box filters that list
+  shows the project-relative path (`rel`), left-truncated with an ellipsis when
+  it does not fit so the filename stays visible; a search box filters that list
   (whitespace-split tokens, case-insensitive substring AND). Polls so the list
   stays current as new notebooks are run. Navigation is a full-page load, so
   each view is a fresh SPA instance that connects to its own stream.
@@ -84,8 +85,9 @@
               <span
                 class="nb-path"
                 use:tooltip={{ value: nb.rel, onlyIfOverflow: true }}
-                >{nb.rel}</span
               >
+                <bdi>{nb.rel}</bdi>
+              </span>
               <span class="nb-meta">
                 {#if nb.active}
                   <a class="nb-link" href={streamHref(nb.path)}>
@@ -176,6 +178,7 @@
     text-decoration: underline;
   }
 
+  /* RTL + LTR-isolated text: overflow clips the start, ellipsis on the left. */
   .nb-path {
     font-family: var(--font-mono);
     font-weight: 600;
@@ -184,6 +187,12 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    direction: rtl;
+    text-align: left;
+  }
+
+  .nb-path bdi {
+    direction: ltr;
   }
 
   .nb-meta {
