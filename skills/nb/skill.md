@@ -140,7 +140,7 @@ daemon to be running and the notebook to have run at least once.
 ```bash
 uv run nb query cells <notebook.py>            # list cells: id, title, line span, status, record count
 uv run nb query records <notebook.py> <CELL>   # display records of a cell (by numeric id)
-uv run nb query exec <notebook.py> -c "CODE"   # run Python against the notebook's live namespace
+uv run nb query exec <notebook.py> -c "CODE"   # one-liner against the live namespace
 ```
 
 - `records` prints text/markdown/html inline. **Tables** show their column→dtype schema
@@ -151,7 +151,18 @@ uv run nb query exec <notebook.py> -c "CODE"   # run Python against the notebook
   it sees every notebook variable and *can mutate them* (changes persist into later
   runs — same as a Jupyter kernel). It prints captured stdout/stderr, renders any
   `display(...)` calls the same way `records` does, and exits non-zero on an uncaught
-  exception. Code may also be piped via stdin (omit `-c`).
+  exception. Use `-c` for a one-liner; omit it and pipe a heredoc (or any stdin) for
+  multi-line code so quotes and indentation stay literal. A bare invocation with
+  neither `-c` nor a pipe errors instead of hanging.
+
+  ```bash
+  uv run nb query exec <notebook.py> -c "print(type(df), df.height)"
+
+  uv run nb query exec <notebook.py> <<'PY'
+  print(df.columns)
+  display(df.head())
+  PY
+  ```
 
 If a query errors with no daemon reply, start the daemon (`uv run nb daemon .`)
 and run the notebook once (`uv run nb run <notebook.py>`) before querying.

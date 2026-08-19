@@ -28,7 +28,7 @@ uv run nb run -w example.py # --watch: re-run automatically on every file save (
 # Query a notebook's saved daemon state without a browser (for agents)
 uv run nb query cells example.py            # list cells: id, title, line span, status, record count
 uv run nb query records example.py 1        # display records of a cell (tables spill to a Parquet file)
-uv run nb query exec example.py -c "CODE"   # run Python against the notebook's live namespace
+uv run nb query exec example.py -c "CODE"   # one-liner against the live namespace (or omit -c and pipe a heredoc)
 
 # Python tests (pytest + pytest-asyncio)
 uv run pytest                                   # all tests

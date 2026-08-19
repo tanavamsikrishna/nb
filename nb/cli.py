@@ -371,14 +371,36 @@ def query_records(notebook: str, cell: int) -> None:
     _print_records(records)
 
 
+def _read_exec_source(code: str | None) -> str:
+    """Python to send to query exec: `-c` if given, otherwise stdin.
+
+    Errors (exit 1) if neither `-c` nor a pipe/heredoc is present, so an
+    interactive TTY does not hang waiting for stdin.
+    """
+    if code is not None:
+        return code
+    if sys.stdin.isatty():
+        click.echo(
+            "No Python given. Pass -c CODE for a one-liner, or pipe a heredoc.",
+            err=True,
+        )
+        sys.exit(1)
+    return sys.stdin.read()
+
+
 @query.command("exec")
 @click.argument("notebook", type=str)
-@click.option("-c", "--code", "code", default=None, help="Python to run; reads stdin if omitted.")
+@click.option(
+    "-c",
+    "--code",
+    "code",
+    default=None,
+    help="Python one-liner. If omitted, reads stdin (heredoc or pipe); errors if stdin is a TTY.",
+)
 def query_exec(notebook: str, code: str | None) -> None:
     """Run arbitrary Python against the notebook's live namespace (kernel)."""
+    code = _read_exec_source(code)
     path, socket_path = _resolve_notebook_target(notebook)
-    if code is None:
-        code = sys.stdin.read()
     reply = _query({"command": "query", "op": "exec", "path": str(path), "code": code}, socket_path)
     if reply.get("stdout"):
         click.echo(reply["stdout"], nl=False)
