@@ -77,7 +77,9 @@ primitives, and `__main__`-defined functions — anything else raises `TypeError
 **Frontend.** Svelte 5 + Vite. `nb-ui/src/lib/stream.ts` opens `EventSource('/stream')` and
 maps SSE events into the `cells` store (`nb-ui/src/stores/cells.ts`). Cells are keyed by
 positional id for stable DOM; `run_start` reconciles the manifest (marking edited cells stale,
-removing absent ones after `run_end`) so scroll position is preserved across runs.
+removing absent ones after `run_end`) so scroll position is preserved across runs. The UI
+targets computer and laptop screens only — do not design for phone layouts, and do not
+verify UI changes on very narrow viewports.
 
 ## Notebook authoring
 

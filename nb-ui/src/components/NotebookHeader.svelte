@@ -8,10 +8,11 @@
   live and experiment views via the `ui` store): the title row (chevron +
   hero title) is always rendered identically — it never moves or restyles.
   Toggling only shows/hides the body below it. Collapsed by default so cells
-  stay front-and-centre. The title heading is hoisted into the row and
-  stripped from the body so it isn't shown twice. The body is measure-capped
-  (~68ch) and centered so hard-wrapped docstring prose does not span the
-  full card.
+  stay front-and-centre. The title heading is hoisted into the row, center
+  aligned, and stripped from the body so it isn't shown twice. The chevron
+  is taken out of flow so it does not offset the title. The body is
+  measure-capped (~68ch) and centered so hard-wrapped docstring prose does
+  not span the full card.
 
   Props:
     docstring  string  — raw Markdown content (default: "")
@@ -79,16 +80,19 @@
     box-shadow: var(--shadow-lg);
   }
 
-  /* Toggle row: chevron + hero title. Identical in both states. */
+  /* Toggle row: chevron + hero title. Identical in both states.
+     Title is centered in the card; the chevron is absolutely positioned
+     so it does not shift the heading off-center. */
   .spec-header {
     display: flex;
     align-items: center;
-    gap: 14px;
+    justify-content: center;
+    position: relative;
     width: 100%;
     padding: 0;
     background: none;
     border: none;
-    text-align: left;
+    text-align: center;
     cursor: pointer;
   }
 
@@ -100,6 +104,8 @@
   }
 
   .chev {
+    position: absolute;
+    left: 0;
     flex: none;
     font-size: 1.1rem;
     color: var(--fg-muted);
@@ -118,6 +124,8 @@
 
   .spec-title {
     margin: 0;
+    padding: 0 1.6em;
+    text-align: center;
     font-family: var(--font-sans);
     font-size: 2.25rem;
     font-weight: 800;
