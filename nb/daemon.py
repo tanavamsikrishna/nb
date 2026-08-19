@@ -53,6 +53,7 @@ class CellState(msgspec.Struct):
 class NotebookEntry(msgspec.Struct):
     path: str
     name: str
+    rel: str  # path relative to `_project_dir`, for the index list
     num_cells: int
     active: bool
     has_experiments: bool
@@ -536,7 +537,8 @@ async def notebooks_handler(request: web.Request) -> web.Response:
     session is live. `num_cells` is 0 for an experiments-only notebook.
 
     Ordered most-recent experiment first (`last_run_id` is time-sortable); notebooks
-    with no saved runs fall to the bottom, path as tiebreaker.
+    with no saved runs fall to the bottom, path as tiebreaker. `rel` is the path
+    relative to the daemon project directory (cwd of `nb daemon .`).
     """
     by_path: dict[str, NotebookEntry] = {}
     last_run: dict[str, str] = {}
@@ -544,6 +546,7 @@ async def notebooks_handler(request: web.Request) -> web.Response:
         by_path[path] = NotebookEntry(
             path=path,
             name=os.path.basename(path),
+            rel=os.path.relpath(path, _project_dir),
             num_cells=len(session.cells),
             active=True,
             has_experiments=False,
@@ -554,6 +557,7 @@ async def notebooks_handler(request: web.Request) -> web.Response:
             entry = NotebookEntry(
                 path=nb.path,
                 name=nb.name,
+                rel=os.path.relpath(nb.path, _project_dir),
                 num_cells=0,
                 active=False,
                 has_experiments=False,

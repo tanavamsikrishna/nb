@@ -82,8 +82,10 @@ export type ConnectionStatus = "connecting" | "connected" | "disconnected";
 export interface NotebookListItem {
   /** Resolved absolute path — the session key and the `?path=` value. */
   path: string;
-  /** Basename, for display. */
+  /** Basename (kept for compatibility; the index list displays `rel`). */
   name: string;
+  /** Path relative to the daemon project directory — the landing-list label. */
+  rel: string;
   num_cells: number;
   /** True when the daemon holds a live session (streamable at `?path=`). */
   active?: boolean;

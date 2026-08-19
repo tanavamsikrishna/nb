@@ -3,12 +3,11 @@
  *
  * Responsibilities:
  *   - Derive a basename from an absolute (or relative) path for header chips.
- *   - Pretty-print a notebook filename for the landing list
- *     ("abc_bcd_cxy.nb.py" → "Abc Bcd Cxy").
+ *   - Match a landing-list query against a project-relative path
+ *     (whitespace-split tokens, case-insensitive substring AND).
  *
- * Headers keep the raw basename (technical mono chip + full path on hover);
- * only the index list uses the humanized title. No daemon/API involvement —
- * pure client formatting over paths the UI already has.
+ * Headers keep the raw basename (technical mono chip + full path on hover).
+ * The index list shows the daemon-provided `rel` path and filters it here.
  */
 
 /** Last path segment; accepts `/` and `\` separators. */
@@ -18,15 +17,12 @@ export function notebookBasename(path: string): string {
 }
 
 /**
- * Landing-page title from a basename or full path.
- * Strips trailing `.nb.py` / `.py`, splits on `_`/`-`, title-cases each token.
+ * True when every whitespace-separated token of `query` appears in `rel`
+ * (case-insensitive). Empty / whitespace-only query matches everything.
  */
-export function prettyNotebookTitle(nameOrPath: string): string {
-  let base = notebookBasename(nameOrPath);
-  base = base.replace(/\.nb\.py$/i, "").replace(/\.py$/i, "");
-  return base
-    .split(/[_-]+/)
-    .filter(Boolean)
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-    .join(" ");
+export function pathMatchesQuery(rel: string, query: string): boolean {
+  const tokens = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return true;
+  const hay = rel.toLowerCase();
+  return tokens.every((t) => hay.includes(t));
 }

@@ -2,6 +2,7 @@ import asyncio
 import importlib
 import json
 import linecache
+import os
 import shutil
 import socket
 import sys
@@ -551,11 +552,15 @@ async def test_notebooks_listing_and_path_scoped_stream(tmp_path: Path) -> None:
         a_path.write_text("# %%\ndisplay(111)\n")
         b_path = tmp_path / "b.py"
         b_path.write_text("# %%\ndisplay(222)\n")
+        nested_path = project_dir / "nested" / "c.py"
+        nested_path.parent.mkdir()
+        nested_path.write_text("# %%\ndisplay(333)\n")
 
         await _run_request(socket_path, {"path": str(a_path)})
         await _run_request(socket_path, {"path": str(b_path)})
+        await _run_request(socket_path, {"path": str(nested_path)})
 
-        # /notebooks lists both notebooks the daemon has run, most recent first.
+        # /notebooks lists every notebook the daemon has run, most recent first.
         async with aiohttp.ClientSession() as session:
             async with session.get(f"http://127.0.0.1:{port}/notebooks") as resp:
                 assert resp.status == 200
@@ -563,8 +568,14 @@ async def test_notebooks_listing_and_path_scoped_stream(tmp_path: Path) -> None:
         paths = [nb["path"] for nb in data["notebooks"]]
         by_path = {nb["path"]: nb for nb in data["notebooks"]}
         assert str(a_path) in by_path and str(b_path) in by_path
+        assert str(nested_path) in by_path
         assert by_path[str(a_path)]["name"] == "a.py"
-        # b ran after a, so it should sort first (last_run_id order).
+        # `rel` is project-relative; files outside the project walk up with `../`.
+        assert by_path[str(nested_path)]["rel"] == "nested/c.py"
+        assert by_path[str(a_path)]["rel"] == os.path.relpath(str(a_path), project_dir)
+        assert by_path[str(b_path)]["rel"] == os.path.relpath(str(b_path), project_dir)
+        # nested ran last, so it should sort first (last_run_id order).
+        assert paths.index(str(nested_path)) < paths.index(str(b_path))
         assert paths.index(str(b_path)) < paths.index(str(a_path))
 
         # Re-run a; it becomes the most recent and should sort first.

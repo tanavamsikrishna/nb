@@ -2,21 +2,29 @@
   NotebookList.svelte — the index view at "/" (no ?path= in the URL).
 
   Lists the notebooks the daemon currently holds state for (GET /notebooks) and
-  links each to its per-notebook stream view at "/?path=<abs path>". Polls so the
-  list stays current as new notebooks are run. Navigation is a full-page load,
-  so each view is a fresh SPA instance that connects to its own stream.
+  links each to its per-notebook stream view at "/?path=<abs path>". Each row
+  shows the project-relative path (`rel`); a search box filters that list
+  (whitespace-split tokens, case-insensitive substring AND). Polls so the list
+  stays current as new notebooks are run. Navigation is a full-page load, so
+  each view is a fresh SPA instance that connects to its own stream.
 -->
 <script lang="ts">
   import { onMount } from "svelte";
   import type { NotebookListItem, NotebooksResponse } from "../lib/types";
-  import { prettyNotebookTitle } from "../lib/notebookPath";
+  import { pathMatchesQuery } from "../lib/notebookPath";
+  import { tooltip } from "../lib/tooltip";
   import AppShell from "./AppShell.svelte";
 
   let notebooks = $state<NotebookListItem[]>([]);
   let loaded = $state(false);
   let failed = $state(false);
+  let query = $state("");
 
   const POLL_MS = 3000;
+
+  const visible = $derived(
+    notebooks.filter((nb) => pathMatchesQuery(nb.rel, query)),
+  );
 
   async function load() {
     try {
@@ -40,6 +48,10 @@
     return "/?view=experiments&path=" + encodeURIComponent(path);
   }
 
+  function onSearchKeydown(e: KeyboardEvent) {
+    if (e.key === "Escape") query = "";
+  }
+
   onMount(() => {
     load();
     const id = setInterval(load, POLL_MS);
@@ -55,32 +67,48 @@
   {/snippet}
 
   {#if loaded && notebooks.length > 0}
-    <ul class="nb-list">
-      {#each notebooks as nb (nb.path)}
-        <li>
-          <div class="nb-item">
-            <span class="nb-name">{prettyNotebookTitle(nb.name)}</span>
-            <span class="nb-path">{nb.path}</span>
-            <span class="nb-meta">
-              {#if nb.active}
-                <a class="nb-link" href={streamHref(nb.path)}>
-                  Live stream
-                  <span class="nb-cells"
-                    >· {nb.num_cells}
-                    {nb.num_cells === 1 ? "cell" : "cells"}</span
-                  >
-                </a>
-              {/if}
-              {#if nb.has_experiments}
-                <a class="nb-link" href={experimentsHref(nb.path)}>
-                  Experiments
-                </a>
-              {/if}
-            </span>
-          </div>
-        </li>
-      {/each}
-    </ul>
+    <input
+      type="search"
+      class="nb-search"
+      placeholder="Search notebooks…"
+      bind:value={query}
+      onkeydown={onSearchKeydown}
+      spellcheck="false"
+      autocomplete="off"
+    />
+    {#if visible.length > 0}
+      <ul class="nb-list">
+        {#each visible as nb (nb.path)}
+          <li>
+            <div class="nb-item">
+              <span
+                class="nb-path"
+                use:tooltip={{ value: nb.rel, onlyIfOverflow: true }}
+                >{nb.rel}</span
+              >
+              <span class="nb-meta">
+                {#if nb.active}
+                  <a class="nb-link" href={streamHref(nb.path)}>
+                    Live stream
+                    <span class="nb-cells"
+                      >· {nb.num_cells}
+                      {nb.num_cells === 1 ? "cell" : "cells"}</span
+                    >
+                  </a>
+                {/if}
+                {#if nb.has_experiments}
+                  <a class="nb-link" href={experimentsHref(nb.path)}>
+                    Experiments
+                  </a>
+                {/if}
+              </span>
+            </div>
+          </li>
+        {/each}
+      </ul>
+    {:else}
+      <p class="no-match">No matching notebooks</p>
+    {/if}
   {:else if loaded}
     <div class="empty-state">
       <h2>No notebooks yet</h2>
@@ -97,6 +125,26 @@
 </AppShell>
 
 <style>
+  .nb-search {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    margin-bottom: 16px;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    background: var(--bg-sunken);
+    color: var(--fg-primary);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    padding: 10px 12px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .nb-search:focus {
+    border-color: var(--color-primary);
+  }
+
   .nb-list {
     list-style: none;
     margin: 0;
@@ -128,17 +176,11 @@
     text-decoration: underline;
   }
 
-  .nb-name {
-    font-family: var(--font-sans);
-    font-weight: 600;
-    font-size: 1rem;
-    color: var(--fg-primary);
-  }
-
   .nb-path {
     font-family: var(--font-mono);
-    font-size: 0.75rem;
-    color: var(--fg-tertiary);
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: var(--fg-primary);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -152,5 +194,13 @@
     font-family: var(--font-sans);
     font-size: 0.75rem;
     color: var(--fg-secondary);
+  }
+
+  .no-match {
+    font-family: var(--font-sans);
+    font-size: 0.9rem;
+    color: var(--fg-secondary);
+    padding: 24px 0;
+    text-align: center;
   }
 </style>
