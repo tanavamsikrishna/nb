@@ -12,7 +12,7 @@ from pathlib import Path
 import aiohttp
 import pytest
 
-import nb.daemon as daemon
+from nb import daemon
 from nb.daemon import CellRecord
 
 

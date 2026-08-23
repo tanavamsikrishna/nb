@@ -6,11 +6,12 @@ import pickle
 import re
 import tempfile
 import types
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from contextvars import ContextVar
 from functools import wraps
 from pathlib import Path
-from typing import Any, Callable, Generator, Literal, TypeVar, cast, overload
+from typing import Any, Literal, TypeVar, cast, overload
 
 import msgspec
 
@@ -52,7 +53,7 @@ _sink: ContextVar[Callable[[DisplayRecord], None]] = ContextVar("_sink", default
 
 
 @contextmanager
-def _capture_into(frame: list[DisplayRecord]) -> Generator[None, None, None]:
+def _capture_into(frame: list[DisplayRecord]) -> Generator[None]:
     """Route display records into ``frame`` (and all ancestor frames) for the block."""
     parent = _sink.get()
 

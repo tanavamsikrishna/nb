@@ -4,9 +4,9 @@ import sys
 import threading
 import time
 import traceback
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, List, Tuple
 
 import nb.framework as fw
 
@@ -99,7 +99,7 @@ def _is_empty_or_only_docstring(code: str) -> bool:
     return False
 
 
-def parse_notebook(source: str) -> Tuple[str | None, List[Cell]]:
+def parse_notebook(source: str) -> tuple[str | None, list[Cell]]:
     try:
         parsed_ast = ast.parse(source)
         docstring = ast.get_docstring(parsed_ast)
@@ -107,8 +107,8 @@ def parse_notebook(source: str) -> Tuple[str | None, List[Cell]]:
         docstring = None
 
     lines = source.splitlines(keepends=True)
-    cells: List[Cell] = []
-    current_cell_lines: List[str] = []
+    cells: list[Cell] = []
+    current_cell_lines: list[str] = []
     current_label = ""
     current_source_line = 1
     cell_id = 0
@@ -158,7 +158,7 @@ def parse_notebook(source: str) -> Tuple[str | None, List[Cell]]:
     return docstring, cells
 
 
-def _cell_for_line(cells: List["Cell"], line: int) -> "Cell":
+def _cell_for_line(cells: list["Cell"], line: int) -> "Cell":
     """The cell that owns `line`: the last cell whose `# %%` header line
     (`source_line - 1`) is at or before `line`. Forgiving of a cursor sitting on
     the header line or anywhere in the body. A line before the first cell maps to
@@ -177,8 +177,8 @@ def run_notebook(
     exec_ns: dict,
     emit_event: Callable[[str, dict], None],
     log_sink: LogSink | None = None,
-    target_lines: Tuple[int, int] | None = None,
-) -> Tuple[bool, str, list[int]]:
+    target_lines: tuple[int, int] | None = None,
+) -> tuple[bool, str, list[int]]:
     """Execute the notebook at `path`. Returns `(errored, run_code, ran_cell_ids)`.
 
     `errored` is True if a cell (or load) errored. `run_code` is the source to

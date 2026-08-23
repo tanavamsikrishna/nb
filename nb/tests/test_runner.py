@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import List, Tuple
 
 from nb.runner import _cell_for_line, parse_notebook, run_notebook
 
@@ -65,7 +64,7 @@ x = 10
 display(x)
 """)
 
-    events: List[Tuple[str, dict]] = []
+    events: list[tuple[str, dict]] = []
 
     def emit_event(event_type: str, event_data: dict) -> None:
         events.append((event_type, event_data))
@@ -97,8 +96,8 @@ print("hello stdout")
 print("oops", file=sys.stderr)
 """)
 
-    events: List[Tuple[str, dict]] = []
-    logs: List[Tuple[str, str]] = []
+    events: list[tuple[str, dict]] = []
+    logs: list[tuple[str, str]] = []
 
     errored, _, _ = run_notebook(
         nb_file,
@@ -131,8 +130,8 @@ def test_run_notebook_syntax_error(tmp_path: Path) -> None:
     nb_file = tmp_path / "bad_nb.py"
     nb_file.write_text("# %%\nx = (\n")  # unterminated — SyntaxError at compile
 
-    events: List[Tuple[str, dict]] = []
-    logs: List[Tuple[str, str]] = []
+    events: list[tuple[str, dict]] = []
+    logs: list[tuple[str, str]] = []
 
     def emit_event(event_type: str, event_data: dict) -> None:
         events.append((event_type, event_data))
@@ -146,7 +145,7 @@ def test_run_notebook_syntax_error(tmp_path: Path) -> None:
     assert cell_end["wall_ms"] == 0 and cell_end["cpu_ms"] == 0
     # The brief notice rides on cell_end (shown in the UI header); the full
     # traceback goes to the CLI via log_sink, NOT to the browser.
-    assert "error" in cell_end and cell_end["error"]
+    assert cell_end.get("error")
     assert any(stream == "stderr" and "SyntaxError" in data for stream, data in logs)
     assert not any(t == "display_record" for t, d in events)
     assert events[-1] == ("run_end", {"status": "error"})
@@ -188,7 +187,7 @@ def test_run_notebook_partial_reuses_namespace(tmp_path: Path) -> None:
     assert ns["x"] == 10 and ns["y"] == 15
 
     # Re-run only cell 1 (line 5). It reads x from the persisted namespace.
-    events: List[Tuple[str, dict]] = []
+    events: list[tuple[str, dict]] = []
     errored, _, _ = run_notebook(nb_file, ns, lambda t, d: events.append((t, d)), None, (5, 5))
 
     assert errored is False
@@ -223,7 +222,7 @@ def test_run_notebook_partial_runs_cell_range_in_order(tmp_path: Path) -> None:
     run_notebook(nb_file, ns, lambda t, d: None)  # full run; order == ['b','c','d']
     ns["order"] = []  # reset so the partial run's contribution is observable
 
-    events: List[Tuple[str, dict]] = []
+    events: list[tuple[str, dict]] = []
     # Range covering cell 1 (line 4) through cell 2 (line 6).
     run_notebook(nb_file, ns, lambda t, d: events.append((t, d)), None, (4, 6))
 
@@ -251,8 +250,8 @@ def test_traceback_uses_file_relative_line_numbers(tmp_path: Path) -> None:
         "1 / 0\n"  # line 9  <- raises here
     )
 
-    events: List[Tuple[str, dict]] = []
-    logs: List[Tuple[str, str]] = []
+    events: list[tuple[str, dict]] = []
+    logs: list[tuple[str, str]] = []
 
     def emit_event(event_type: str, event_data: dict) -> None:
         events.append((event_type, event_data))

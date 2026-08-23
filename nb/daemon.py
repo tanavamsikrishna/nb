@@ -17,10 +17,10 @@ import time
 import traceback
 import webbrowser
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from importlib.machinery import ModuleSpec, PathFinder, SourceFileLoader
 from pathlib import Path
-from typing import Any, Set, TypeGuard
+from typing import Any, TypeGuard
 
 import aiohttp
 import msgspec
@@ -233,7 +233,7 @@ class Client:
     path: str | None
 
 
-active_clients: Set[Client] = set()
+active_clients: set[Client] = set()
 run_lock = asyncio.Lock()
 
 
@@ -492,7 +492,7 @@ def emit_event(event_type: str, event_data: dict, path: str) -> None:
 
 def _format_sse(event: dict) -> bytes:
     data_str = json.dumps(event["data"])
-    return f"event: {event['event']}\ndata: {data_str}\n\n".encode("utf-8")
+    return f"event: {event['event']}\ndata: {data_str}\n\n".encode()
 
 
 async def stream_handler(request: web.Request) -> web.StreamResponse:
@@ -607,9 +607,7 @@ async def experiment_diff_handler(request: web.Request) -> web.Response:
     a_id = request.query["a"]
     b_id = request.query["b"]
     # difft can take a moment on large notebooks; don't block the event loop.
-    result = await asyncio.to_thread(
-        experiments.diff_run_code, _project_dir, path, a_id, b_id
-    )
+    result = await asyncio.to_thread(experiments.diff_run_code, _project_dir, path, a_id, b_id)
     return web.json_response(result)
 
 
@@ -957,7 +955,7 @@ async def handle_ipc_client(reader: asyncio.StreamReader, writer: asyncio.Stream
                 fw._artifacts = []
 
                 # Execute notebook in separate thread so exec doesn't block the main event loop
-                started_at = datetime.now(timezone.utc).isoformat()
+                started_at = datetime.now(UTC).isoformat()
                 t0 = time.perf_counter()
                 errored, run_code, ran_cell_ids = await loop.run_in_executor(
                     None,

@@ -99,10 +99,10 @@ events = pl.DataFrame(
             datetime.datetime(2026, 6, 18, 8, 0, 0),
         ],
         "utc_ts": [
-            datetime.datetime(2026, 6, 15, 16, 30, 0, 250000, tzinfo=datetime.timezone.utc),
-            datetime.datetime(2026, 6, 16, 21, 5, 12, tzinfo=datetime.timezone.utc),
-            datetime.datetime(2026, 6, 17, 1, 45, 30, tzinfo=datetime.timezone.utc),
-            datetime.datetime(2026, 6, 18, 15, 0, 0, tzinfo=datetime.timezone.utc),
+            datetime.datetime(2026, 6, 15, 16, 30, 0, 250000, tzinfo=datetime.UTC),
+            datetime.datetime(2026, 6, 16, 21, 5, 12, tzinfo=datetime.UTC),
+            datetime.datetime(2026, 6, 17, 1, 45, 30, tzinfo=datetime.UTC),
+            datetime.datetime(2026, 6, 18, 15, 0, 0, tzinfo=datetime.UTC),
         ],
         "time_of_day": [
             datetime.time(9, 30, 0, 123000),

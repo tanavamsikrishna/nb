@@ -28,7 +28,7 @@ import os
 import re
 import shutil
 import subprocess
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, NamedTuple
 
@@ -68,7 +68,7 @@ def _notebook_dir(root: Any, notebook_path: Any) -> Path:
 def _mint_run_id() -> str:
     # Microsecond UTC timestamp keeps ids lexically sortable (newest sorts last);
     # the random suffix guards against any same-microsecond collision.
-    ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S-%f")
+    ts = datetime.now(UTC).strftime("%Y%m%d-%H%M%S-%f")
     return f"{ts}-{os.urandom(2).hex()}"
 
 
@@ -209,8 +209,7 @@ def list_notebooks(root: Any) -> list[NotebookInfo]:
         for d in nb_dir.iterdir():
             if d.is_dir() and (d / "meta.json").is_file():
                 run_count += 1
-                if d.name > last_run_id:
-                    last_run_id = d.name
+                last_run_id = max(last_run_id, d.name)
         out.append(
             NotebookInfo(
                 path=info["path"],
