@@ -18,7 +18,8 @@
   Side-effects: Executes SQL queries against DuckDB on user interaction.
   Constraints: conn must be an active AsyncDuckDB connection. Resting and
     editing caption states share one row height so toggling does not shift
-    the table.
+    the table. The SQL caption is independent of the table and spans the
+    cell, so the query box stays usable when the grid is narrow.
 -->
 <script lang="ts">
   import { tick } from "svelte";
@@ -341,113 +342,108 @@
     <div class="table-label">{label}</div>
   {/if}
 
-  <div class="table-block">
-    <!-- Caption: row counts at rest; same-height SQL editor when open. -->
-    <div
-      class="table-caption"
-      bind:this={captionEl}
-      onfocusout={handleCaptionFocusOut}
-    >
-      {#if editing}
-        <input
-          type="text"
-          class="query-input"
-          bind:value={sql}
-          onkeydown={handleKeydown}
-          spellcheck="false"
-          placeholder="SELECT …"
-          aria-label="SQL query"
-        />
-        {#if dirty}
-          <button
-            type="button"
-            class="btn btn-run dirty"
-            onclick={submit}
-            onmousedown={keepFocus}
-            disabled={loading}
-          >
-            Run ●
-          </button>
-        {/if}
-        {#if showReset}
-          <button
-            type="button"
-            class="btn btn-reset"
-            onclick={reset}
-            onmousedown={keepFocus}
-          >
-            Reset
-          </button>
-        {/if}
-      {:else}
+  <!-- Caption: row counts at rest; same-height SQL editor when open. -->
+  <div
+    class="table-caption"
+    bind:this={captionEl}
+    onfocusout={handleCaptionFocusOut}
+  >
+    {#if editing}
+      <input
+        type="text"
+        class="query-input"
+        bind:value={sql}
+        onkeydown={handleKeydown}
+        spellcheck="false"
+        placeholder="SELECT …"
+        aria-label="SQL query"
+      />
+      {#if dirty}
         <button
           type="button"
-          class="caption-toggle"
-          onclick={startEdit}
-          title="Query this table"
+          class="btn btn-run dirty"
+          onclick={submit}
+          onmousedown={keepFocus}
+          disabled={loading}
         >
-          {#if customized}
-            <!-- prettier-ignore -->
-            <span
-              class="caption-sql"
-              use:tooltip={{ value: submittedSql, onlyIfOverflow: true }}
-            >{submittedSql}</span><span class="caption-meta">
-              · {shortCount}</span
-            >
-          {:else}
-            <span class="caption-meta">{defaultCount}</span>
-          {/if}
-          {#if dirty}
-            <span class="dirty-dot" aria-hidden="true">●</span>
-          {/if}
+          Run ●
         </button>
       {/if}
-    </div>
-
-    {#if queryError}
-      <div class="query-error">{queryError}</div>
+      {#if showReset}
+        <button
+          type="button"
+          class="btn btn-reset"
+          onclick={reset}
+          onmousedown={keepFocus}
+        >
+          Reset
+        </button>
+      {/if}
+    {:else}
+      <button
+        type="button"
+        class="caption-toggle"
+        onclick={startEdit}
+        title="Query this table"
+      >
+        {#if customized}
+          <!-- prettier-ignore -->
+          <span
+            class="caption-sql"
+            use:tooltip={{ value: submittedSql, onlyIfOverflow: true }}
+          >{submittedSql}</span><span class="caption-meta">
+            · {shortCount}</span
+          >
+        {:else}
+          <span class="caption-meta">{defaultCount}</span>
+        {/if}
+        {#if dirty}
+          <span class="dirty-dot" aria-hidden="true">●</span>
+        {/if}
+      </button>
     {/if}
+  </div>
 
-    <div class="table-scroll" class:dimmed={loading}>
-      <table>
-        <thead>
+  {#if queryError}
+    <div class="query-error">{queryError}</div>
+  {/if}
+
+  <div class="table-scroll" class:dimmed={loading}>
+    <table>
+      <thead>
+        <tr>
+          {#each columns as col}
+            <th class:numeric={col.numeric} title={col.name}>
+              <span class="col-name">{col.name}</span>
+              {#if col.zoneLabel}<span class="col-zone">({col.zoneLabel})</span
+                >{/if}
+            </th>
+          {/each}
+        </tr>
+      </thead>
+      <tbody>
+        {#each rows as row, i (i)}
           <tr>
             {#each columns as col}
-              <th class:numeric={col.numeric} title={col.name}>
-                <span class="col-name">{col.name}</span>
-                {#if col.zoneLabel}<span class="col-zone"
-                    >({col.zoneLabel})</span
-                  >{/if}
-              </th>
+              <td
+                class:numeric={col.numeric}
+                use:tooltip={cellTooltip(row[col.name], col)}
+              >
+                {#if row[col.name] === null}
+                  <span class="null-val">—</span>
+                {:else}
+                  {displayValue(row[col.name], col)}
+                {/if}
+              </td>
             {/each}
           </tr>
-        </thead>
-        <tbody>
-          {#each rows as row, i (i)}
-            <tr>
-              {#each columns as col}
-                <td
-                  class:numeric={col.numeric}
-                  use:tooltip={cellTooltip(row[col.name], col)}
-                >
-                  {#if row[col.name] === null}
-                    <span class="null-val">—</span>
-                  {:else}
-                    {displayValue(row[col.name], col)}
-                  {/if}
-                </td>
-              {/each}
-            </tr>
-          {:else}
-            <tr>
-              <td colspan={columns.length || 1} class="empty-msg">
-                No results
-              </td>
-            </tr>
-          {/each}
-        </tbody>
-      </table>
-    </div>
+        {:else}
+          <tr>
+            <td colspan={columns.length || 1} class="empty-msg">No results</td>
+          </tr>
+        {/each}
+      </tbody>
+    </table>
   </div>
 </div>
 
@@ -465,15 +461,6 @@
     margin-bottom: 6px;
   }
 
-  /* Caption + table share one column sized by the grid. */
-  .table-block {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    width: max-content;
-    max-width: 100%;
-  }
-
   /*
     Resting and editing share this height so toggling (and Run/Reset
     appearing) cannot shift the table. Input/buttons use a transparent 1px
@@ -486,10 +473,8 @@
     box-sizing: border-box;
     height: 22px;
     margin-bottom: 6px;
-    /* Don't contribute intrinsic width — the table sizes the block; the
-       caption stretches to that width and ellipsizes. */
-    width: 0;
-    min-width: 100%;
+    /* Don't let long SQL expand the cell; ellipsize in the flex children. */
+    min-width: 0;
     max-width: 100%;
     font-size: 0.75rem;
     line-height: 1.25;
@@ -616,8 +601,7 @@
     border-radius: var(--radius-md);
     transition: opacity 0.2s;
     /* Shrink-wrap the bordered box to the table, but never exceed the
-       container — at which point overflow-x scrolls. The caption above
-       stretches to this same column width. */
+       container — at which point overflow-x scrolls. */
     width: max-content;
     max-width: 100%;
   }
