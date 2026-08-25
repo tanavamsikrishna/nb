@@ -18,7 +18,7 @@ The repo has two sub-projects:
 
 ```bash
 # Setup (installs all optional + dev deps via uv)
-make install              # == uv sync --extra all --extra dev
+make install # == uv sync --extra all --extra dev
 
 # Run the notebook system (two terminals)
 uv run nb daemon .          # start the daemon once per project session (serves :7777)
@@ -26,9 +26,9 @@ uv run nb run example.py    # send a run request to the daemon over the .nb.sock
 uv run nb run -w example.py # --watch: re-run automatically on every file save (Ctrl-C to stop)
 
 # Query a notebook's saved daemon state without a browser (for agents)
-uv run nb query cells example.py            # list cells: id, title, line span, status, record count
-uv run nb query records example.py 1        # display records of a cell (tables spill to a Parquet file)
-uv run nb query exec example.py -c "CODE"   # one-liner against the live namespace (or omit -c and pipe a heredoc)
+uv run nb query cells example.py          # list cells: id, title, line span, status, record count
+uv run nb query records example.py 1      # display records of a cell (tables spill to a Parquet file)
+uv run nb query exec example.py -c "CODE" # one-liner against the live namespace (or omit -c and pipe a heredoc)
 
 # Python tests (pytest + pytest-asyncio)
 uv run pytest                                   # all tests
@@ -36,10 +36,10 @@ uv run pytest nb/tests/test_framework.py        # one file
 uv run pytest nb/tests/test_cache.py::test_name # one test
 
 # Frontend
-cd nb-ui && pnpm dev          # vite dev server; proxies /stream -> :7777 (daemon must run)
-cd nb-ui && pnpm build        # production build -> nb-ui/dist
-cd nb-ui && pnpm format       # prettier
-make build                    # pnpm build + copy dist -> nb/static/
+cd nb-ui && pnpm dev    # vite dev server; proxies /stream -> :7777 (daemon must run)
+cd nb-ui && pnpm build  # production build -> nb-ui/dist
+cd nb-ui && pnpm format # prettier
+make build              # pnpm build + copy dist -> nb/static/
 ```
 
 `nb/static/` and `nb-ui/dist/` are gitignored build artifacts. The daemon serves the prebuilt
@@ -80,6 +80,13 @@ positional id for stable DOM; `run_start` reconciles the manifest (marking edite
 removing absent ones after `run_end`) so scroll position is preserved across runs. The UI
 targets computer and laptop screens only — do not design for phone layouts, and do not
 verify UI changes on very narrow viewports.
+
+## Frontend verification (BrowserOS)
+
+BrowserOS MCP is the only way to check the frontend in this project. It is expected to be
+available in every session. If the BrowserOS tools are missing, BrowserOS was not started —
+ask the user to start it, then wait. Do not fall back to other browsers, headless fetchers,
+screenshots, curl-against-HTML, or any other substitute for BrowserOS.
 
 ## Notebook authoring
 
