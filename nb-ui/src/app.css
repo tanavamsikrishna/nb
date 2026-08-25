@@ -1,13 +1,21 @@
 /*
  * app.css — Global base styles and scrollbar theming for nb-notebook.
  * Body defaults, resets, and custom scrollbar colors. Relies on tokens from
- * theme.css, which must be imported before this file in main.js.
+ * theme.css, which must be imported before this file in main.ts. Scrollbars
+ * and buttons follow the OS color scheme via those tokens.
  */
 
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+}
+
+/* Drop UA button chrome so OS dark-mode form styling cannot paint over
+   custom buttons (the spec title lives inside one). */
+button {
+  appearance: none;
+  -webkit-appearance: none;
 }
 
 body {
@@ -151,7 +159,7 @@ body {
   pointer-events: none;
 }
 
-/* Custom Scrollbar — light warm palette */
+/* Custom Scrollbar — token colors, follows the active palette */
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;

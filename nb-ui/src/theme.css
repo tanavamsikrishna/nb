@@ -1,18 +1,25 @@
 /*
- * theme.css — Global design tokens for the nb-notebook light theme.
+ * theme.css — Global design tokens for the nb-notebook UI.
+ *
  * CSS custom properties (typography, colors, shadows, spacing, radii) for all
- * components; import once in main.js. Static light palette, no runtime switching.
+ * components; import once in main.ts. Palettes follow the OS color scheme:
+ * warm paper + blurple in light, warm charcoal + a brighter blurple in dark.
+ * Native controls follow via `color-scheme`. No in-app theme toggle.
+ *
  * Web fonts load via the @import below.
  */
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap");
 
 :root {
+  color-scheme: light;
+
   /* Typography — sans UI/prose, mono for data & code */
-  --font-serif:
-    "Inter", system-ui, -apple-system, sans-serif;
+  --font-serif: "Inter", system-ui, -apple-system, sans-serif;
   /* was New York/Georgia */
   --font-sans: "Inter", system-ui, -apple-system, sans-serif;
-  --font-mono: "MonaspiceNe Nerd Font", "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-mono:
+    "MonaspiceNe Nerd Font", "JetBrains Mono", ui-monospace, SFMono-Regular,
+    monospace;
 
   /* Backgrounds — warm paper, distinct steps (not a single wash) */
   --bg-base: #f7f6f3;
@@ -25,6 +32,7 @@
   --fg-primary: #212229;
   --fg-secondary: #6b6e77;
   --fg-tertiary: #a2a4ad;
+  --fg-muted: var(--fg-tertiary);
   --fg-on-accent: #ffffff;
 
   /* Borders — hairlines */
@@ -84,4 +92,60 @@
   /* Selection — light accent tint */
   --color-selection-bg: #e3dffb;
   --color-selection-fg: #212229;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+
+    /* Backgrounds — warm charcoal, same step structure as light */
+    --bg-base: #1a1917;
+    --bg-elevated: #242320;
+    --bg-sunken: #141312;
+    --bg-muted: #2c2b28;
+    --bg-header: #1f1e1c;
+
+    /* Foreground / Text */
+    --fg-primary: #eceae4;
+    --fg-secondary: #a3a199;
+    --fg-tertiary: #7c7a74;
+    --fg-muted: var(--fg-tertiary);
+    --fg-on-accent: #ffffff;
+
+    /* Borders */
+    --border-default: #3d3c38;
+    --border-subtle: #2f2e2b;
+
+    /* Primary / Accent — brighter blurple so it holds contrast on charcoal */
+    --color-primary: #a39ae6;
+    --color-secondary: #b7b0ed;
+    --color-accent: #a39ae6;
+
+    /* Semantic — lifted a step so they stay readable on dark surfaces */
+    --color-error: #e06b63;
+    --color-success: #4cba86;
+    --color-warning: #e0a04a;
+    --color-info: #a39ae6;
+    --color-link: #a39ae6;
+    --color-link-visited: #c090d0;
+
+    /* Shadows — darker ambient, still warm-neutral */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+    --shadow-md: 0 4px 12px -2px rgba(0, 0, 0, 0.45);
+    --shadow-lg: 0 12px 32px -6px rgba(0, 0, 0, 0.55);
+
+    /* Interactive states — lighter on hover (opposite of the light palette) */
+    --color-interactive-hover: #b4abeb;
+    --color-interactive-active: #c4bdf0;
+    --color-focus-ring-offset: #1a1917;
+
+    /* Code surfaces */
+    --fg-code: #d4d0e0;
+    --bg-code-inline: #2a2838;
+    --bg-code-block: #141312;
+
+    /* Selection */
+    --color-selection-bg: #3d3568;
+    --color-selection-fg: #eceae4;
+  }
 }

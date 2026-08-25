@@ -9,8 +9,10 @@
   hero title) is always rendered identically — it never moves or restyles.
   Toggling only shows/hides the body below it. Collapsed by default so cells
   stay front-and-centre. The title heading is hoisted into the row, center
-  aligned, and stripped from the body so it isn't shown twice. The chevron
-  is taken out of flow so it does not offset the title. The body is
+  aligned, and stripped from the body so it isn't shown twice. Title color
+  is a solid `--color-primary` token (not clipped gradient text) so it stays
+  visible in both color schemes. The chevron is taken out of flow so it
+  does not offset the title. The body is
   measure-capped (~68ch) and centered so hard-wrapped docstring prose does
   not span the full card.
 
@@ -90,8 +92,10 @@
     position: relative;
     width: 100%;
     padding: 0;
+    appearance: none;
     background: none;
     border: none;
+    color: inherit;
     text-align: center;
     cursor: pointer;
   }
@@ -122,6 +126,9 @@
     color: var(--fg-secondary);
   }
 
+  /* Solid token color — not background-clip:text. Transparent-fill
+     gradient titles vanish under OS dark mode (UA button styling and
+     forced-colors both fail to paint the clipped background). */
   .spec-title {
     margin: 0;
     padding: 0 1.6em;
@@ -130,18 +137,14 @@
     font-size: 2.25rem;
     font-weight: 800;
     letter-spacing: -0.025em;
-    background: linear-gradient(
-      135deg,
-      var(--color-primary) 0%,
-      var(--color-secondary) 100%
-    );
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
+    color: var(--color-primary);
+    -webkit-text-fill-color: var(--color-primary);
   }
 
   .spec-title :global(code) {
     font-family: var(--font-mono);
     font-size: 0.85em;
+    color: inherit;
+    -webkit-text-fill-color: inherit;
   }
 </style>
