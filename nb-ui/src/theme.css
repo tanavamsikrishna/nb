@@ -14,11 +14,11 @@
   color-scheme: light;
 
   /* Typography — sans UI/prose, mono for data & code */
-  --font-serif: "Inter", system-ui, -apple-system, sans-serif;
+  --font-serif: "New York", system-ui, -apple-system, sans-serif;
   /* was New York/Georgia */
-  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-sans: "SF Pro", system-ui, -apple-system, sans-serif;
   --font-mono:
-    "MonaspiceNe Nerd Font", "JetBrains Mono", ui-monospace, SFMono-Regular,
+    "MonaspiceAr Nerd Font", "JetBrains Mono", ui-monospace, SFMono-Regular,
     monospace;
 
   /* Backgrounds — warm paper, distinct steps (not a single wash) */
