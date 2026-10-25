@@ -9,13 +9,7 @@
 
 /** Render kind of a display record. Mirrors nb/framework.py `_create_display_record`. */
 export type RecordType =
-  | "md"
-  | "html"
-  | "text"
-  | "object"
-  | "table"
-  | "plotly"
-  | "altair";
+  "md" | "html" | "text" | "object" | "table" | "plotly" | "altair";
 
 /** Base64-encoded Parquet payload for a `table` record (see `_serialize_table`). */
 export interface TablePayload {
@@ -82,9 +76,9 @@ export type ConnectionStatus = "connecting" | "connected" | "disconnected";
 export interface NotebookListItem {
   /** Resolved absolute path — the session key and the `?path=` value. */
   path: string;
-  /** Basename (kept for compatibility; the index list displays `rel`). */
+  /** Basename, including the `.nb.py` suffix. */
   name: string;
-  /** Path relative to the daemon project directory — the landing-list label. */
+  /** Path relative to the daemon project directory. The index splits this into basename + parent folder. */
   rel: string;
   num_cells: number;
   /** True when the daemon holds a live session (streamable at `?path=`). */

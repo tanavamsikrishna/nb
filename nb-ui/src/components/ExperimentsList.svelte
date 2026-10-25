@@ -275,7 +275,7 @@
     align-items: center;
     gap: 10px;
     font-family: var(--font-sans);
-    font-size: 0.8rem;
+    font-size: 0.75rem;
   }
 
   .run-status {

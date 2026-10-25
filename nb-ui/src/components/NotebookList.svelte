@@ -1,18 +1,18 @@
 <!--
   NotebookList.svelte — the index view at "/" (no ?path= in the URL).
 
-  Lists the notebooks the daemon currently holds state for (GET /notebooks) and
-  links each to its per-notebook stream view at "/?path=<abs path>". Each row
-  shows the project-relative path (`rel`), left-truncated with an ellipsis when
-  it does not fit so the filename stays visible; a search box filters that list
+  Lists notebooks the daemon knows about (GET /notebooks): live sessions and
+  those with stored experiments. Each row shows the basename (foo.nb.py) then
+  the project-relative parent folder, and links to the live stream and/or
+  experiment history. A search box filters the full relative path
   (whitespace-split tokens, case-insensitive substring AND). Polls so the list
-  stays current as new notebooks are run. Navigation is a full-page load, so
-  each view is a fresh SPA instance that connects to its own stream.
+  stays current. Navigation is a full-page load, so each view is a fresh SPA
+  instance that connects to its own stream.
 -->
 <script lang="ts">
   import { onMount } from "svelte";
   import type { NotebookListItem, NotebooksResponse } from "../lib/types";
-  import { pathMatchesQuery } from "../lib/notebookPath";
+  import { notebookRelParts, pathMatchesQuery } from "../lib/notebookPath";
   import { tooltip } from "../lib/tooltip";
   import AppShell from "./AppShell.svelte";
 
@@ -80,13 +80,22 @@
     {#if visible.length > 0}
       <ul class="nb-list">
         {#each visible as nb (nb.path)}
+          {@const parts = notebookRelParts(nb.rel)}
           <li>
             <div class="nb-item">
-              <span
-                class="nb-path"
-                use:tooltip={{ value: nb.rel, onlyIfOverflow: true }}
-              >
-                <bdi>{nb.rel}</bdi>
+              <span class="nb-title">
+                <span
+                  class="nb-name"
+                  use:tooltip={{ value: nb.rel, onlyIfOverflow: true }}
+                  >{parts.name}</span
+                >
+                {#if parts.parent}
+                  <span
+                    class="nb-dir"
+                    use:tooltip={{ value: parts.parent, onlyIfOverflow: true }}
+                    >{parts.parent}</span
+                  >
+                {/if}
               </span>
               <span class="nb-meta">
                 {#if nb.active}
@@ -153,18 +162,26 @@
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 12px;
   }
 
   .nb-item {
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    padding: 14px 18px;
+    gap: 4px;
+    padding: 12px 16px;
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-md);
     background: var(--bg-muted);
     color: inherit;
+    transition:
+      border-color 0.12s ease,
+      background 0.12s ease;
+  }
+
+  .nb-item:hover {
+    border-color: var(--color-primary);
+    background: var(--bg-sunken);
   }
 
   .nb-link {
@@ -178,28 +195,41 @@
     text-decoration: underline;
   }
 
-  /* RTL + LTR-isolated text: overflow clips the start, ellipsis on the left. */
-  .nb-path {
+  /* Filename first, parent folder after — same row rhythm as experiment runs. */
+  .nb-title {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    min-width: 0;
     font-family: var(--font-mono);
-    font-weight: 600;
-    font-size: 0.95rem;
+  }
+
+  .nb-name {
+    flex: 0 1 auto;
+    max-width: 70%;
+    font-size: 0.75rem;
+    font-weight: 400;
     color: var(--fg-primary);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    direction: rtl;
-    text-align: left;
   }
 
-  .nb-path bdi {
-    direction: ltr;
+  .nb-dir {
+    flex: 1 1 0;
+    min-width: 0;
+    color: var(--fg-tertiary);
+    font-size: 0.75rem;
+    font-weight: 400;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .nb-meta {
     display: flex;
     align-items: center;
-    gap: 8px;
-    margin-top: 4px;
+    gap: 10px;
     font-family: var(--font-sans);
     font-size: 0.75rem;
     color: var(--fg-secondary);
