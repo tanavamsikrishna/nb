@@ -118,6 +118,13 @@ clean = df.drop_nulls().filter(pl.col("value") > 0)
 display(clean.head(), label="Cleaned")
 ```
 
+**Perusal-level comments:** each `# %%` section must carry comments a
+reader can understand without running the cell — what the section does,
+why its key choices were made (look-ahead, filtering, joins), and what
+its outputs mean. Comment the *intent and load-bearing decisions*, not
+the mechanics of each line; if a section's purpose needs only the cell
+title to be clear, one or two lines above the code are enough.
+
 ## Running a Notebook
 
 ```bash
@@ -181,6 +188,12 @@ LEARNING_RATE = 0.01   # auto-detected params: shown in the UI *and* logged
 EPOCHS = 10
 MODEL = "resnet"
 ```
+
+Reserve `SCREAMING_SNAKE_CASE` for tunable hyperparameters worth logging
+against a run (learning rates, windows, flags). Plumbing constants —
+column lists, file paths, helper thresholds — use lowercase (or a leading
+`_`) so they stay out of the UI header and experiment log. Naming a
+constant `COMMON`/`COLUMNS`/`PATHS` in caps pollutes every run's params.
 
 **Artifacts** are output files (a model checkpoint, a saved plot, a CSV) recorded
 against the run. `artifact_path(filename)` creates a fresh empty file with that
