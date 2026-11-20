@@ -3,8 +3,8 @@ name: nb
 description: >-
   Use when writing or editing `nb` framework notebooks. A file is an nb notebook
   if and only if its name ends with `.nb.py`. Covers cell structure, module
-  docstrings (file-level meaning contract), the run/query/cache CLI workflow,
-  and points to guide.nb.py for display/@nb_cache.
+  docstrings, the run/query/cache CLI workflow, and points to guide.nb.py for
+  display/@nb_cache.
 ---
 
 # nb — Python Notebook Framework
@@ -23,72 +23,34 @@ notebook description in the UI.
 
 ```python
 """
-Notebook description (Markdown supported).
+# Notebook Title
+
+One-paragraph summary (Markdown supported).
 """
 
 # %% Cell Title
 # code...
 ```
 
-### Module docstring (file-level spec)
+### Module docstring
 
-The module docstring is a **short contract for what the experiment means** and how
-to interpret its results—not a design doc, not an implementation walkthrough, and
-not a table of contents for the cells below. Prefer plain language over formulas.
-Markdown is fine.
+Limit the module docstring to a `#` level-1 title and one brief paragraph
+(Markdown supported). Use that paragraph to state what the notebook tests or
+explores, along with any provenance or overarching assumptions needed to read
+the results.
 
-Keep it short: typically a `#` title plus a few short paragraphs. Length is a
-*smell*, not a hard cap—if it reads like a design doc, or lists cell outputs and
-formulas, cut until only interpretation-critical content remains.
-
-#### Should include
-
-- **Title + one-line purpose** — `# Title` (level-1 heading), then a
-  short purpose line; identity in the UI
-- **Provenance** when relevant — paper, idea, or research question being tested
-- **Conceptual rules** — strategy or analysis in plain language (what is ranked,
-  held, compared, etc.)
-- **Load-bearing semantics** — decisions that change how results should be read if
-  missed (e.g. no look-ahead, fully invested, costs excluded, intersection of
-  symbols limits history)
-- **Deliberate non-goals** — paper features or obvious extensions *not* in this
-  notebook (often more valuable than a long “in scope” list)
-- **Non-obvious data assumptions** only when they affect interpretation — one short
-  line, not a schema dump
-
-#### Should not include
-
-- Implementation formulas that are readable from the code
-  (`close[t] / close[t-N] - 1`, `position[m] = signal[m-1]`, …)
-- Tie-break rules, clamp logic, NaN edge cases, and other programming hygiene
-- Exhaustive output inventories that mirror cells / the sidebar
-- Parameter lists and defaults — SCREAMING_SNAKE_CASE params are already shown by
-  the UI and logged with experiments
-- Project-standard plumbing (usual parquet layout, standard `read_index_data`
-  columns, import paths) unless this notebook is special
-- Cell-by-cell outlines or section maps
-
-**Self-check before finishing:**
-
-1. Would changing this line change how a reader *judges the results*? If no, drop it.
-2. Does the UI or code already show this (params, cells, formulas)? If yes, drop it.
-3. Is “out of scope” clearer than another methodology bullet?
+Leave out implementation details, formulas, edge cases, parameter lists, output
+inventories, and section outlines—the UI already displays `SCREAMING_SNAKE_CASE`
+params and cell titles, and analytical choices belong in each cell's comments.
 
 ```python
 """
 # Relative Strength Allocation
 
-Replication of Faber (2010) relative-strength rotation on a configurable universe
-(default: NIFTY + GOLDBEES).
-
-Each rebalance, rank symbols by trailing return over `LOOKBACK_PERIODS` bars and
-hold equal-weight top `TOP_N` until the next rebalance. Long-only, fully invested,
-no look-ahead (signal at period-end is held over the *next* period), no costs.
-
-**Out of scope:** SMA hedge → cash, multi-horizon combo ranking, transaction costs.
-
-History is the intersection of symbols' period bars (shortest series dominates).
-When both nifty and goldbees are present, benchmarks include a static 70/30 mix.
+Replicates Faber (2010) relative-strength rotation across a configurable universe
+(default: NIFTY + GOLDBEES). Holds equal-weight top `TOP_N` symbols by trailing
+return each rebalance, long-only with no look-ahead, transaction costs, or SMA
+cash hedge.
 """
 ```
 

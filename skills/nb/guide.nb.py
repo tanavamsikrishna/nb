@@ -2,12 +2,8 @@
 # `nb` API reference notebook
 
 Annotated examples for `display`, `@nb_cache`, params, and artifacts. Open or run
-this file when you need the full API surface; the `nb` skill covers structure and
-workflow.
-
-Keep real analysis notebooks' module docstrings short: meaning and interpretation
-of the experiment, not an implementation walkthrough (see the skill's "Module
-docstring" section).
+this file when you need the full API surface; the `nb` skill covers workflow,
+cell structure, and keeping module docstrings to a title and brief summary.
 """
 
 # %% Setup
