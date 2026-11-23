@@ -27,7 +27,7 @@ import msgspec
 from aiohttp import web
 
 import nb.framework as fw
-from nb import experiments, runner
+from nb import code_diff, experiments, runner
 
 
 class CellRecord(msgspec.Struct):
@@ -162,7 +162,12 @@ def _freeze_linecache(filename: str, text: str) -> None:
     """Pin `text` as the linecache source for `filename` with mtime=None (permanent —
     checkcache skips it), so tracebacks render this exact source even after the file
     changes on disk. Mirrors the notebook-source freeze in runner.py."""
-    linecache.cache[filename] = (len(text), None, text.splitlines(keepends=True), filename)
+    linecache.cache[filename] = (
+        len(text),
+        None,
+        text.splitlines(keepends=True),
+        filename,
+    )
 
 
 class _PinningLoader(SourceFileLoader):
@@ -174,7 +179,9 @@ class _PinningLoader(SourceFileLoader):
 
     def get_code(self, fullname):
         try:
-            text = importlib.util.decode_source(self.get_data(self.path))  # PEP 263 cookie
+            text = importlib.util.decode_source(
+                self.get_data(self.path)
+            )  # PEP 263 cookie
             _freeze_linecache(self.path, text)
         except Exception:
             pass  # pinning must never break the import that triggered it
@@ -391,7 +398,9 @@ def _fold_state(event_type: str, data: dict, path: str) -> None:
         cell = _state_find_cell(cells, data["cell_id"])
         if cell is not None:
             cell.status = data.get("status", "ok")
-            cell.profiling = CellProfiling(wall_ms=data.get("wall_ms"), cpu_ms=data.get("cpu_ms"))
+            cell.profiling = CellProfiling(
+                wall_ms=data.get("wall_ms"), cpu_ms=data.get("cpu_ms")
+            )
 
 
 def _snapshot_events(session: NotebookSession | None) -> list[dict]:
@@ -411,7 +420,9 @@ def _snapshot_events(session: NotebookSession | None) -> list[dict]:
     events.append({"event": "notebook_header", "data": header})
 
     manifest = [{"id": c.id, "title": c.title or ""} for c in session.cells]
-    events.append({"event": "run_start", "data": {"cell_manifest": manifest, "partial": False}})
+    events.append(
+        {"event": "run_start", "data": {"cell_manifest": manifest, "partial": False}}
+    )
 
     for cell in session.cells:
         events.append(
@@ -599,15 +610,26 @@ async def experiment_handler(request: web.Request) -> web.Response:
 
 
 async def experiment_diff_handler(request: web.Request) -> web.Response:
-    """Side-by-side code diff of two full runs via system `difft`.
+    """Side-by-side code diff of two full runs.
 
-    Query: `path`, `a` (base run id), `b` (updated run id).
+    Query: `path`, `a` (base run id), `b` (updated run id), `scheme`
+    (`light` or `dark` — required; the UI color scheme).
     """
     path = request.query["path"]
     a_id = request.query["a"]
     b_id = request.query["b"]
-    # difft can take a moment on large notebooks; don't block the event loop.
-    result = await asyncio.to_thread(experiments.diff_run_code, _project_dir, path, a_id, b_id)
+    scheme = request.query.get("scheme")
+    if scheme not in code_diff.COLOR_SCHEMES:
+        return web.json_response({"error": "scheme must be light or dark"}, status=400)
+    # Diffing can take a moment on large notebooks; don't block the event loop.
+    result = await asyncio.to_thread(
+        experiments.diff_run_code,
+        _project_dir,
+        path,
+        a_id,
+        b_id,
+        color_scheme=scheme,
+    )
     return web.json_response(result)
 
 
@@ -662,7 +684,9 @@ def _query_cells(session: NotebookSession) -> dict:
         total_lines = None
 
     # Header line of each cell (the `# %%` line), in order.
-    headers = [(c.source_line - 1) if c.source_line is not None else None for c in cells]
+    headers = [
+        (c.source_line - 1) if c.source_line is not None else None for c in cells
+    ]
     out = []
     for i, cell in enumerate(cells):
         start = headers[i]
@@ -747,9 +771,14 @@ def _query_records(session: NotebookSession, cell_id: int | None) -> dict:
     cell = _state_find_cell(session.cells, cell_id)
     if cell is None:
         ids = [c.id for c in session.cells]
-        return {"status": "error", "message": f"No cell {cell_id}. Available cells: {ids}"}
+        return {
+            "status": "error",
+            "message": f"No cell {cell_id}. Available cells: {ids}",
+        }
     cid = cell.id
-    records = [_render_record(r, session, f"c{cid}", n) for n, r in enumerate(cell.records)]
+    records = [
+        _render_record(r, session, f"c{cid}", n) for n, r in enumerate(cell.records)
+    ]
     return {"status": "ok", "cell": cid, "records": records}
 
 
@@ -796,7 +825,10 @@ async def _handle_query(req: dict, writer: asyncio.StreamWriter) -> None:
     path = str(Path(req["path"]))
     session = _sessions.get(path)
     if session is None:
-        reply: dict = {"status": "error", "message": f"Notebook {path} has not been run yet."}
+        reply: dict = {
+            "status": "error",
+            "message": f"Notebook {path} has not been run yet.",
+        }
     else:
         loop = asyncio.get_running_loop()
         op = req.get("op")
@@ -805,7 +837,9 @@ async def _handle_query(req: dict, writer: asyncio.StreamWriter) -> None:
         elif op == "records":
             # Rendering a table decodes Parquet and writes CSV to disk; run it off
             # the event loop so a large table can't stall live SSE to browsers.
-            reply = await loop.run_in_executor(None, _query_records, session, req.get("cell"))
+            reply = await loop.run_in_executor(
+                None, _query_records, session, req.get("cell")
+            )
         elif op == "exec":
             if not session.exec_ns:
                 reply = {
@@ -813,7 +847,9 @@ async def _handle_query(req: dict, writer: asyncio.StreamWriter) -> None:
                     "message": "Notebook has no execution namespace yet; run it first.",
                 }
             else:
-                reply = await loop.run_in_executor(None, _exec_in_ns, session, req.get("code", ""))
+                reply = await loop.run_in_executor(
+                    None, _exec_in_ns, session, req.get("code", "")
+                )
         else:
             reply = {"status": "error", "message": f"Unknown query op: {op!r}."}
 
@@ -821,7 +857,9 @@ async def _handle_query(req: dict, writer: asyncio.StreamWriter) -> None:
     await writer.drain()
 
 
-async def handle_ipc_client(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+async def handle_ipc_client(
+    reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+) -> None:
     async with run_lock:
         try:
             line = await reader.readline()
@@ -838,7 +876,9 @@ async def handle_ipc_client(reader: asyncio.StreamReader, writer: asyncio.Stream
                 return
 
             notebook_path = Path(req["path"])
-            ns_key = str(notebook_path)  # session key + the path this run's events route to
+            ns_key = str(
+                notebook_path
+            )  # session key + the path this run's events route to
             clear_cache_names = req.get("clear_cache")
             clear_cache_all = req.get("clear_cache_all", False)
             clear_imports = req.get("clear_imports", False)
@@ -854,7 +894,9 @@ async def handle_ipc_client(reader: asyncio.StreamReader, writer: asyncio.Stream
                 }
                 # Display primitives run in the executor thread, so hop back to
                 # the event loop thread to touch the client queues.
-                loop.call_soon_threadsafe(emit_event, "display_record", event_data, ns_key)
+                loop.call_soon_threadsafe(
+                    emit_event, "display_record", event_data, ns_key
+                )
 
             old_emitter = fw._active_emitter
             fw._active_emitter = active_emitter
@@ -867,7 +909,9 @@ async def handle_ipc_client(reader: asyncio.StreamReader, writer: asyncio.Stream
                 # executor thread; hop to the loop thread to write the CLI socket.
                 # Fire-and-forget like thread_safe_emit_event; the drain before the
                 # terminal reply flushes the buffer.
-                msg = json.dumps({"status": stream, "data": data}).encode("utf-8") + b"\n"
+                msg = (
+                    json.dumps({"status": stream, "data": data}).encode("utf-8") + b"\n"
+                )
                 loop.call_soon_threadsafe(writer.write, msg)
 
             try:
@@ -880,14 +924,24 @@ async def handle_ipc_client(reader: asyncio.StreamReader, writer: asyncio.Stream
                 if clear_cache_all:
                     functions = len({e.qualname for e in fw._cache.values()})
                     fw.clear_all_cache()
-                    cache_result = {"all": True, "functions": functions, "unmatched": []}
+                    cache_result = {
+                        "all": True,
+                        "functions": functions,
+                        "unmatched": [],
+                    }
                 elif clear_cache_names:
                     functions, unmatched = fw.clear_cache_by_name(clear_cache_names)
-                    cache_result = {"all": False, "functions": functions, "unmatched": unmatched}
+                    cache_result = {
+                        "all": False,
+                        "functions": functions,
+                        "unmatched": unmatched,
+                    }
 
                 if cache_result is not None:
                     writer.write(
-                        json.dumps({"status": "cache", "cache": cache_result}).encode("utf-8")
+                        json.dumps({"status": "cache", "cache": cache_result}).encode(
+                            "utf-8"
+                        )
                         + b"\n"
                     )
                     await writer.drain()
@@ -934,7 +988,10 @@ async def handle_ipc_client(reader: asyncio.StreamReader, writer: asyncio.Stream
                     target_lines = (int(lines[0]), int(lines[1]))
                 else:
                     if lines is not None:
-                        cli_log("stdout", "No saved state for this notebook; running it in full.\n")
+                        cli_log(
+                            "stdout",
+                            "No saved state for this notebook; running it in full.\n",
+                        )
                     # Full run: fresh namespace ("purge"); keep any existing render
                     # cells so the full-run reconcile can preserve surviving output.
                     if session is None:
@@ -1045,7 +1102,9 @@ async def open_site_in_browser(site_url: str) -> None:
     stdout, _ = await process.communicate()
     tab_infos = stdout.decode().strip().splitlines()
 
-    tab_ids = [g.group(1) for e in tab_infos if (g := re.match(r"\[(?:\d+:)?(\d+)\] nb-ui", e))]
+    tab_ids = [
+        g.group(1) for e in tab_infos if (g := re.match(r"\[(?:\d+:)?(\d+)\] nb-ui", e))
+    ]
     if len(tab_ids) > 0:
         tab_id = tab_ids[0]
         active_process = await asyncio.subprocess.create_subprocess_exec(
@@ -1059,6 +1118,7 @@ async def open_site_in_browser(site_url: str) -> None:
 async def main(project_dir: Path, *, host: str = "0.0.0.0", port: int = 7777) -> None:
     global _project_dir
     _project_dir = project_dir
+    code_diff.register()
     # Pin module sources at import time so tracebacks show the code that ran even if
     # the file is edited while the notebook is still running (see _PinningLoader).
     # Inserted at the front of meta_path to wrap the loader before a module is loaded.
@@ -1079,7 +1139,9 @@ async def main(project_dir: Path, *, host: str = "0.0.0.0", port: int = 7777) ->
     app.router.add_get("/", index_handler)
     app.router.add_static("/", STATIC_DIR)
 
-    socket_server = await asyncio.start_unix_server(handle_ipc_client, path=str(socket_path))
+    socket_server = await asyncio.start_unix_server(
+        handle_ipc_client, path=str(socket_path)
+    )
 
     runner_http = web.AppRunner(app)
     await runner_http.setup()
@@ -1088,7 +1150,9 @@ async def main(project_dir: Path, *, host: str = "0.0.0.0", port: int = 7777) ->
 
     site_url = f"http://localhost:{port}"
 
-    print(f"Daemon started. Unix socket at {socket_path}, HTTP at {site_url}", flush=True)
+    print(
+        f"Daemon started. Unix socket at {socket_path}, HTTP at {site_url}", flush=True
+    )
 
     # _task = asyncio.create_task(open_site_in_browser(site_url))
 

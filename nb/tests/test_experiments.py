@@ -3,10 +3,12 @@ import shutil
 from pathlib import Path
 
 import msgspec
+import pytest
 
 import nb.framework as fw
-from nb import experiments
+from nb import code_diff, experiments
 from nb.daemon import CellProfiling, CellRecord, CellState
+from nb.services import set_service
 
 
 def _cell(cell_id: int, records: list[dict], *, title: str = "", status: str = "ok") -> CellState:
@@ -275,12 +277,19 @@ def test_artifact_path_writes_into_current_run_dir(tmp_path: Path) -> None:
         fw._current_run_dir, fw._artifacts = old_dir, old_list
 
 
+@pytest.fixture(autouse=True)
+def _code_diff_service() -> None:
+    code_diff.register()
+
+
 def test_diff_run_code_identical(tmp_path: Path) -> None:
     nb_path = "/proj/example.py"
     code = "# %%\nx = 1\n"
     a = _save_full(tmp_path, nb_path, [_cell(0, [])], code=code)
     b = _save_full(tmp_path, nb_path, [_cell(0, [])], code=code)
-    result = experiments.diff_run_code(tmp_path, nb_path, a, b)
+    result = experiments.diff_run_code(
+        tmp_path, nb_path, a, b, color_scheme="light"
+    )
     assert result["identical"] is True
     assert result["diff"] == ""
     assert result["a"]["run_id"] == a
@@ -292,12 +301,58 @@ def test_diff_run_code_differs(tmp_path: Path) -> None:
     a = _save_full(tmp_path, nb_path, [_cell(0, [])], code="# %%\nx = 1\n")
     b = _save_full(tmp_path, nb_path, [_cell(0, [])], code="# %%\nx = 2\n")
     try:
-        result = experiments.diff_run_code(tmp_path, nb_path, a, b)
+        result = experiments.diff_run_code(
+            tmp_path, nb_path, a, b, color_scheme="light"
+        )
     except FileNotFoundError:
-        # difft not installed in this environment.
+        # Diff tool not installed in this environment.
         return
     assert result["identical"] is False
     assert result["diff"]  # non-empty side-by-side body
+    assert result["a"]["run_id"] == a
+    assert result["b"]["run_id"] == b
+
+
+def test_diff_run_code_color_scheme(tmp_path: Path) -> None:
+    # The scheme the caller sends must change the diff palette; a hardcoded
+    # background would make these two calls identical.
+    nb_path = "/proj/example.py"
+    a = _save_full(tmp_path, nb_path, [_cell(0, [])], code="# %%\nx = 1\n")
+    b = _save_full(tmp_path, nb_path, [_cell(0, [])], code="# %%\nx = 2\n")
+    try:
+        light = experiments.diff_run_code(
+            tmp_path, nb_path, a, b, color_scheme="light"
+        )
+        dark = experiments.diff_run_code(
+            tmp_path, nb_path, a, b, color_scheme="dark"
+        )
+    except FileNotFoundError:
+        return
+    assert light["diff"] != dark["diff"]
+    assert "\x1b" in light["diff"] and "\x1b" in dark["diff"]
+
+
+def test_diff_run_code_rejects_unknown_scheme(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="color_scheme"):
+        experiments.diff_run_code(
+            tmp_path, "/proj/example.py", "a", "b", color_scheme="blue"
+        )
+
+
+def test_diff_run_code_delegates_to_service(tmp_path: Path) -> None:
+    class _Fake:
+        def diff(self, left: Path, right: Path, *, color_scheme: str) -> str:
+            return f"{color_scheme}:{left.read_text()}=>{right.read_text()}"
+
+    set_service(code_diff.CodeDiff, _Fake())
+    nb_path = "/proj/example.py"
+    a = _save_full(tmp_path, nb_path, [_cell(0, [])], code="# %%\nx = 1\n")
+    b = _save_full(tmp_path, nb_path, [_cell(0, [])], code="# %%\nx = 2\n")
+    result = experiments.diff_run_code(
+        tmp_path, nb_path, a, b, color_scheme="dark"
+    )
+    assert result["identical"] is False
+    assert result["diff"] == "dark:# %%\nx = 1\n=># %%\nx = 2\n"
     assert result["a"]["run_id"] == a
     assert result["b"]["run_id"] == b
 

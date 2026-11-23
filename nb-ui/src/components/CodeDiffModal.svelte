@@ -1,12 +1,14 @@
 <!--
-  CodeDiffModal.svelte — large modal showing difft side-by-side output for two
-  full experiment runs (always older → newer). Fetches GET /experiment/diff;
-  ANSI → HTML via ansi_up.
+  CodeDiffModal.svelte — large modal showing a side-by-side code diff for two
+  full experiment runs (always older → newer). Fetches GET /experiment/diff
+  with the current UI color scheme; ANSI → HTML via ansi_up. Refetches if the
+  OS color scheme changes while the modal is open.
 -->
 <script lang="ts">
   import { onMount } from "svelte";
   import { AnsiUp } from "ansi_up";
   import type {
+    ExperimentDiffRequest,
     ExperimentDiffResponse,
     ExperimentDiffSide,
     ParamsMap,
@@ -31,8 +33,30 @@
   let loading = $state(true);
 
   const ansi = new AnsiUp();
-  // Inline styles (not classes) so difft's palette works without custom CSS.
+  // Inline styles (not classes) so the diff palette works without custom CSS.
   ansi.use_classes = false;
+
+  function diffUrl(req: ExperimentDiffRequest): string {
+    return (
+      "/experiment/diff?path=" +
+      encodeURIComponent(req.path) +
+      "&a=" +
+      encodeURIComponent(req.a) +
+      "&b=" +
+      encodeURIComponent(req.b) +
+      "&scheme=" +
+      encodeURIComponent(req.scheme)
+    );
+  }
+
+  function colorScheme(): "light" | "dark" {
+    return window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light";
+  }
+
+  // Bumped on each load so a scheme change mid-fetch can't apply a stale diff.
+  let loadSeq = 0;
 
   function when(iso: string): string {
     const d = new Date(iso);
@@ -57,27 +81,25 @@
   );
 
   async function load() {
+    const seq = ++loadSeq;
     loading = true;
     error = null;
     data = null;
     try {
       const resp = await fetch(
-        "/experiment/diff?path=" +
-          encodeURIComponent(path) +
-          "&a=" +
-          encodeURIComponent(aId) +
-          "&b=" +
-          encodeURIComponent(bId),
+        diffUrl({ path, a: aId, b: bId, scheme: colorScheme() }),
       );
+      if (seq !== loadSeq) return;
       if (!resp.ok) {
         const body = await resp.json().catch(() => null);
         throw new Error(body?.error ?? `HTTP ${resp.status}`);
       }
       data = (await resp.json()) as ExperimentDiffResponse;
     } catch (e) {
+      if (seq !== loadSeq) return;
       error = e instanceof Error ? e.message : String(e);
     } finally {
-      loading = false;
+      if (seq === loadSeq) loading = false;
     }
   }
 
@@ -86,9 +108,15 @@
   }
 
   onMount(() => {
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const onScheme = () => load();
+    mq.addEventListener("change", onScheme);
     load();
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => {
+      mq.removeEventListener("change", onScheme);
+      window.removeEventListener("keydown", onKey);
+    };
   });
 </script>
 
@@ -150,7 +178,7 @@
     background: var(--bg-elevated);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-lg);
-    /* Keep in sync with difft --width=180 in experiments.diff_run_code. */
+    /* Keep in sync with DIFF_COLUMNS in nb/code_diff.py. */
     width: min(1400px, 96vw);
     max-height: min(90vh, 900px);
     display: flex;

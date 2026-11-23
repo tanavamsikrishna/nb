@@ -129,8 +129,21 @@ export interface ExperimentDiffSide {
 }
 
 /**
- * Side-by-side code diff of two full runs. `diff` is difftastic stdout and may
- * contain ANSI color escapes (rendered client-side).
+ * Query for `GET /experiment/diff`. `scheme` is required so the rendered
+ * palette matches the UI color scheme (`prefers-color-scheme`).
+ */
+export interface ExperimentDiffRequest {
+  path: string;
+  /** Base (older) run id. */
+  a: string;
+  /** Updated (newer) run id. */
+  b: string;
+  scheme: "light" | "dark";
+}
+
+/**
+ * Side-by-side code diff of two full runs. `diff` may contain ANSI color
+ * escapes (rendered client-side); empty when `identical`.
  */
 export interface ExperimentDiffResponse {
   a: ExperimentDiffSide;

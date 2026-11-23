@@ -6,7 +6,7 @@
   its read-only viewer at ?path=<path>&run=<run_id>.
 
   Full (top-level) runs can be multi-selected (max 2) to open a code diff modal
-  via GET /experiment/diff (server-side difft).
+  via GET /experiment/diff (server-side diff).
 -->
 <script lang="ts">
   import { onMount } from "svelte";
@@ -86,7 +86,9 @@
     <span class="logo-separator">/</span>
     <span class="logo-sub">experiments</span>
     <span class="logo-separator">/</span>
-    <span class="notebook-name" use:tooltip={path}>{notebookBasename(path)}</span>
+    <span class="notebook-name" use:tooltip={path}
+      >{notebookBasename(path)}</span
+    >
   {/snippet}
 
   {#if loaded && runs.length > 0}

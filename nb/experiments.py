@@ -27,12 +27,14 @@ import json
 import os
 import re
 import shutil
-import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, NamedTuple
 
 import msgspec
+
+from nb.code_diff import COLOR_SCHEMES, CodeDiff
+from nb.services import get_service
 
 EXPERIMENTS_SUBDIR = (".nb", "experiments")
 
@@ -44,6 +46,7 @@ class NotebookInfo(msgspec.Struct):
     # Max run directory name among saved runs. run_ids are minted as
     # YYYYMMDD-HHMMSS-ffffff-xxxx so lexical max == most recent run.
     last_run_id: str = ""
+
 
 # run_id is minted by us and only ever travels back as an opaque token; still,
 # validate it before joining onto a filesystem path (it arrives over HTTP).
@@ -94,7 +97,12 @@ def begin_run(root: Any, notebook_path: Any) -> RunHandle:
     nb_json = nb_dir / "notebook.json"
     if not nb_json.exists():
         nb_json.write_text(
-            json.dumps({"path": str(notebook_path), "name": os.path.basename(str(notebook_path))}),
+            json.dumps(
+                {
+                    "path": str(notebook_path),
+                    "name": os.path.basename(str(notebook_path)),
+                }
+            ),
             encoding="utf-8",
         )
 
@@ -139,7 +147,9 @@ def finalize_run(
         "params": params,
         "artifacts": artifacts,
     }
-    (handle.run_dir / "meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
+    (handle.run_dir / "meta.json").write_text(
+        json.dumps(meta, indent=2), encoding="utf-8"
+    )
     (handle.run_dir / "code.py").write_text(code, encoding="utf-8")
     (handle.run_dir / "records.json").write_text(
         msgspec.json.encode(cells).decode("utf-8"), encoding="utf-8"
@@ -275,7 +285,9 @@ def load_run(root: Any, notebook_path: Any, run_id: str) -> dict | None:
         "code": code,
         "docstring": docstring,
         "cells": (
-            json.loads(records_file.read_text(encoding="utf-8")) if records_file.is_file() else []
+            json.loads(records_file.read_text(encoding="utf-8"))
+            if records_file.is_file()
+            else []
         ),
     }
 
@@ -290,14 +302,32 @@ def _diff_side(meta: dict) -> dict:
     }
 
 
-def diff_run_code(root: Any, notebook_path: Any, a_id: str, b_id: str) -> dict:
-    """Side-by-side code diff of two full runs via system `difft`.
+def diff_run_code(
+    root: Any,
+    notebook_path: Any,
+    a_id: str,
+    b_id: str,
+    *,
+    color_scheme: str,
+) -> dict:
+    """Side-by-side code diff of two full runs.
 
     Expects existing full-run ids for ``notebook_path``. Parses stored meta/code
-    and runs difft; does not re-check call arguments.
+    and asks the registered `CodeDiff` service to render the diff; does not
+    re-check call arguments. ``color_scheme`` is ``"light"`` or ``"dark"``
+    (the UI's ``prefers-color-scheme``).
 
-    Returns ``{a, b, identical, diff}``. ``diff`` is difftastic stdout (with ANSI).
+    Returns ``{a, b, identical, diff}``. ``diff`` is ANSI text, empty when the
+    stored sources are identical.
+
+    A non-identical pair requires `nb.code_diff.register()` (or another
+    `CodeDiff`) beforehand.
     """
+    if color_scheme not in COLOR_SCHEMES:
+        raise ValueError(
+            f"color_scheme must be 'light' or 'dark', got {color_scheme!r}"
+        )
+
     a_dir = _notebook_dir(root, notebook_path) / a_id
     b_dir = _notebook_dir(root, notebook_path) / b_id
     a_meta = json.loads((a_dir / "meta.json").read_text(encoding="utf-8"))
@@ -310,27 +340,10 @@ def diff_run_code(root: Any, notebook_path: Any, a_id: str, b_id: str) -> dict:
     if a_code.read_bytes() == b_code.read_bytes():
         return {"a": a_side, "b": b_side, "identical": True, "diff": ""}
 
-    # --color=always: ANSI even when stdout is a pipe.
-    # --background=light: matches the light UI theme.
-    # --width: non-TTY has no terminal size. Sized for the CodeDiffModal
-    # (~min(1400px, 96vw) at 0.75rem mono ≈ 180 columns for side-by-side).
-    proc = subprocess.run(
-        [
-            "difft",
-            "--display=side-by-side",
-            "--color=always",
-            "--background=light",
-            "--width=180",
-            str(a_code),
-            str(b_code),
-        ],
-        capture_output=True,
-        text=True,
-        check=True,
-    )
+    diff = get_service(CodeDiff).diff(a_code, b_code, color_scheme=color_scheme)
     return {
         "a": a_side,
         "b": b_side,
         "identical": False,
-        "diff": proc.stdout,
+        "diff": diff,
     }
